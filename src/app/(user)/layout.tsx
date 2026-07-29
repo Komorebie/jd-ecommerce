@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
+import UserLayout from "@/components/layout/UserLayout";
 
 export const metadata: Metadata = {
   title: "仿京东电商平台",
   description: "多角色电商平台 — 用户端",
 };
 
-export default function UserLayout({
+export default function UserRouteLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <>{children}</>;
+  return <UserLayout>{children}</UserLayout>;
 }
