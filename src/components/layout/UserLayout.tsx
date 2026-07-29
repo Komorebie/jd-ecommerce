@@ -42,12 +42,14 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
     router.push("/login");
   };
 
-  const userMenu = {
-    items: [
-      { key: "profile", label: "修改密码", icon: <UserOutlined />, onClick: () => router.push("/profile/change-password") },
-      { key: "logout", label: "退出登录", icon: <LogoutOutlined />, onClick: handleLogout },
-    ],
-  };
+  const userMenu = session
+    ? {
+        items: [
+          { key: "profile", label: "修改密码", icon: <UserOutlined />, onClick: () => router.push("/profile/change-password") },
+          { key: "logout", label: "退出登录", icon: <LogoutOutlined />, onClick: handleLogout },
+        ],
+      }
+    : { items: [] };
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
@@ -70,17 +72,28 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
           </Text>
           <Menu
             mode="horizontal"
-            selectedKeys={[pathname]}
+            selectedKeys={[pathname === "/" ? "/" : pathname.startsWith("/products") ? "/products" : pathname]}
             items={menuItems}
             style={{ border: "none", flex: 1, minWidth: 400 }}
           />
         </div>
-        <Dropdown menu={userMenu} placement="bottomRight">
-          <Space style={{ cursor: "pointer" }}>
-            <Avatar icon={<UserOutlined />} />
-            <Text>{session?.user?.name || "用户"}</Text>
+        {session ? (
+          <Dropdown menu={userMenu} placement="bottomRight">
+            <Space style={{ cursor: "pointer" }}>
+              <Avatar icon={<UserOutlined />} />
+              <Text>{session.user?.name}</Text>
+            </Space>
+          </Dropdown>
+        ) : (
+          <Space>
+            <Link href="/login">
+              <Button type="link">登录</Button>
+            </Link>
+            <Link href="/register">
+              <Button type="primary">注册</Button>
+            </Link>
           </Space>
-        </Dropdown>
+        )}
       </Header>
       <Content style={{ background: "#f5f5f5" }}>{children}</Content>
     </Layout>

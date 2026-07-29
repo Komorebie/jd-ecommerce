@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Providers from "@/components/layout/Providers";
 import UserLayout from "@/components/layout/UserLayout";
 
 export const metadata: Metadata = {
@@ -11,5 +12,9 @@ export default function UserRouteLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <UserLayout>{children}</UserLayout>;
+  return (
+    <Providers>
+      <UserLayout>{children}</UserLayout>
+    </Providers>
+  );
 }

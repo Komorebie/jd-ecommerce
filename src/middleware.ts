@@ -32,6 +32,7 @@ export default withAuth(
         const path = req.nextUrl.pathname;
         // 公开页面无需登录
         if (path === "/login" || path === "/register" || path === "/forgot-password") return true;
+        if (path === "/" || path.startsWith("/products")) return true;
         // 其他页面需要登录
         return !!token;
       },

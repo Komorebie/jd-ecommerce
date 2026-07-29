@@ -113,3 +113,24 @@ last_updated: 2026-07-29
 4. **状态机**：订单和退款状态流转参考 api-spec.md 末尾的状态图
 5. **提交规范**：`feat:` 开头，一个功能一个 commit
 6. **完成后提 PR 到 master**，由你 review 合并
+
+## 重要：已踩过的坑
+
+### 样式丢失
+
+如页面样式全部丢失，运行：
+```bash
+npm run dev:clean
+```
+不要直接 `npm run dev`。原因是 `.next` 缓存可能过期导致 Ant Design CSS 未正确注入。
+
+### Prisma Decimal 类型
+
+price、amount 等字段在 API 返回的 JSON 中是**字符串**（不是数字），前端必须用 `Number()` 转换：
+```typescript
+const formatPrice = (p: string | number) => `¥${Number(p).toFixed(2)}`;
+```
+
+### @ant-design/nextjs-registry 版本
+
+**禁止**升级 `@ant-design/nextjs-registry` 到 1.3.0+。1.3.0 依赖 `@ant-design/cssinjs@2.x`，而 antd 5.x 依赖 `@ant-design/cssinjs@1.x`，版本不匹配会导致所有 Ant Design 样式永久失效。

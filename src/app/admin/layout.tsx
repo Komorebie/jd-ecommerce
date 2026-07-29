@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Providers from "@/components/layout/Providers";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 
 export const metadata: Metadata = {
@@ -11,5 +12,9 @@ export default function AdminRouteLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <DashboardLayout role="ADMIN">{children}</DashboardLayout>;
+  return (
+    <Providers>
+      <DashboardLayout role="ADMIN">{children}</DashboardLayout>
+    </Providers>
+  );
 }

@@ -11,7 +11,9 @@
 | Next.js | 14.x | 不可升 15+，使用 Pages Router 外的 App Router |
 | React | 18.x | 不可升 19+ |
 | TypeScript | 5.5+ | strict: true |
-| Ant Design | 5.x | 组件库，不引入其他 UI 库 |
+| Ant Design | 5.x | 组件库，不可引入其他 UI 库 |
+| @ant-design/nextjs-registry | 1.2.x | 不可升 1.3+（cssinjs 版本冲突，样式会丢失） |
+| @ant-design/cssinjs | 1.x | 必须与 antd 共用同一版本，不可出现 2.x |
 | Tailwind CSS | 3.x | 仅用于补充样式，不替代 Ant Design |
 | Prisma | 5.x | ORM，不引入其他数据库工具 |
 | NextAuth | 4.x | 认证，不可换用其他方案 |
@@ -39,6 +41,8 @@
 5. **服务端优先** — 数据获取在服务端组件完成，客户端组件仅负责交互；数据变更通过 API Routes
 6. **构造注入** — 不依赖 DI 容器，函数接收依赖作为参数或从模块导入
 7. **错误码体系** — API 返回统一格式 `{ code, message, data }`，错误码定义见 docs/reference/error-codes.md
+8. **Prisma Decimal 类型** — Prisma 的 Decimal 字段序列化为 JSON 时为 `string`，前端接收到的 price/amount 等字段是字符串，需 `Number()` 转换后再计算
+9. **样式缓存** — 如页面样式丢失，运行 `npm run dev:clean` 清除 `.next` 缓存重启
 
 ## 提交规范
 

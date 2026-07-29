@@ -18,3 +18,21 @@ status: active
 - 组件默认服务端渲染，需要交互时加 `'use client'`
 - 使用 ESLint + Prettier 保持代码风格一致
 - API 返回统一格式：`{ code: number, message: string, data: T | null }`
+
+## 关键注意事项
+
+### Prisma Decimal 类型
+
+Prisma 的 `Decimal` 字段（price、amount 等）序列化为 JSON 时为 **字符串**，不是数字。前端接收时必须用 `Number()` 转换：
+
+```typescript
+// 前端接口类型中 price 定义为 string，不是 number
+interface Product { price: string; ... }
+
+// 显示时用 Number() 转换
+const formatPrice = (p: string | number) => `¥${Number(p).toFixed(2)}`;
+```
+
+### 样式缓存问题
+
+如页面样式丢失，运行 `npm run dev:clean` 清除缓存并重启。**不可**升级 `@ant-design/nextjs-registry` 到 1.3+，会导致 `@ant-design/cssinjs` 版本冲突。
