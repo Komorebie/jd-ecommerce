@@ -1,0 +1,217 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  MERCHANT
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  BANNED
+}
+
+enum MerchantStatus {
+  PENDING
+  ACTIVE
+  BANNED
+}
+
+enum ProductStatus {
+  ON_SALE
+  OFF_SHELF
+  BANNED
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PENDING_SHIPMENT
+  SHIPPED
+  REFUNDING
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+enum RefundStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CLOSED
+}
+
+model User {
+  id           Int        @id @default(autoincrement())
+  email        String     @unique
+  passwordHash String
+  name         String
+  phone        String?
+  role         Role       @default(USER)
+  avatarUrl    String?
+  status       UserStatus @default(ACTIVE)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  merchant    Merchant?
+  orders      Order[]
+  cartItems   CartItem[]
+  reviews     Review[]
+  addresses   Address[]
+  refunds     Refund[]
+}
+
+model Merchant {
+  id          Int            @id @default(autoincrement())
+  userId      Int            @unique
+  shopName    String
+  description String?
+  logoUrl     String?
+  status      MerchantStatus @default(PENDING)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id])
+  products Product[]
+  orders   Order[]
+}
+
+model Category {
+  id        Int        @id @default(autoincrement())
+  name      String
+  parentId  Int?
+  iconUrl   String?
+  sortOrder Int        @default(0)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryTree")
+  products Product[]
+}
+
+model Product {
+  id          Int           @id @default(autoincrement())
+  merchantId  Int
+  categoryId  Int
+  name        String
+  description String
+  price       Decimal       @db.Decimal(10, 2)
+  stock       Int           @default(0)
+  images      Json          @default("[]")
+  status      ProductStatus @default(ON_SALE)
+  salesCount  Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  merchant   Merchant    @relation(fields: [merchantId], references: [id])
+  category   Category    @relation(fields: [categoryId], references: [id])
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+  reviews    Review[]
+}
+
+model CartItem {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  productId Int
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@unique([userId, productId])
+}
+
+model Order {
+  id          Int         @id @default(autoincrement())
+  orderNo     String      @unique
+  userId      Int
+  merchantId  Int
+  addressId   Int
+  totalAmount Decimal     @db.Decimal(10, 2)
+  status      OrderStatus @default(PENDING_PAYMENT)
+  remark      String?
+  paidAt      DateTime?
+  shippedAt   DateTime?
+  completedAt DateTime?
+  cancelledAt DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  user      User       @relation(fields: [userId], references: [id])
+  merchant  Merchant   @relation(fields: [merchantId], references: [id])
+  address   Address    @relation(fields: [addressId], references: [id])
+  items     OrderItem[]
+  refunds   Refund[]
+}
+
+model OrderItem {
+  id           Int     @id @default(autoincrement())
+  orderId      Int
+  productId    Int
+  productName  String
+  productImage String
+  price        Decimal @db.Decimal(10, 2)
+  quantity     Int
+
+  order   Order   @relation(fields: [orderId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+}
+
+model Address {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  receiver   String
+  phone      String
+  province   String
+  city       String
+  district   String
+  detail     String
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user   User    @relation(fields: [userId], references: [id])
+  orders Order[]
+}
+
+model Review {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  productId Int
+  orderId   Int
+  rating    Int
+  content   String?
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@unique([userId, productId, orderId])
+}
+
+model Refund {
+  id          Int          @id @default(autoincrement())
+  orderId     Int
+  userId      Int
+  reason      String
+  amount      Decimal      @db.Decimal(10, 2)
+  status      RefundStatus @default(PENDING)
+  rejectReason String?
+  appliedAt   DateTime     @default(now())
+  resolvedAt  DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id])
+  user  User  @relation(fields: [userId], references: [id])
+}
