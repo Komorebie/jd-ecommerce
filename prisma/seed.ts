@@ -3,6 +3,10 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 async function main() {
+  // Clear existing seed data
+  await prisma.product.deleteMany();
+  await prisma.category.deleteMany();
+
   // === Categories ===
   const categories = await Promise.all([
     prisma.category.create({ data: { name: "手机数码", sortOrder: 1 } }),
@@ -49,10 +53,10 @@ async function main() {
         "A18 Pro 芯片 / 6.9 英寸超视网膜 XDR 显示屏 / 4800 万像素主摄 / 钛金属设计 / USB-C 接口",
       price: 9999.0,
       stock: 128,
-      images: JSON.stringify([
+      images: [
         "https://picsum.photos/seed/iphone1/400/400",
         "https://picsum.photos/seed/iphone2/400/400",
-      ]),
+      ],
       status: "ON_SALE" as const,
     },
     {
@@ -63,10 +67,10 @@ async function main() {
         "麒麟 9100 芯片 / 6.82 英寸 OLED 曲面屏 / XMAGE 影像系统 / 卫星通信 / 昆仑玻璃",
       price: 7999.0,
       stock: 256,
-      images: JSON.stringify([
+      images: [
         "https://picsum.photos/seed/huawei1/400/400",
         "https://picsum.photos/seed/huawei2/400/400",
-      ]),
+      ],
       status: "ON_SALE" as const,
     },
     {
@@ -77,9 +81,9 @@ async function main() {
         "骁龙 8 Gen 4 / 6.73 英寸 AMOLED / 徕卡光学镜头 / 120W 超级快充 / 澎湃 OS",
       price: 6499.0,
       stock: 0,
-      images: JSON.stringify([
+      images: [
         "https://picsum.photos/seed/xiaomi1/400/400",
-      ]),
+      ],
       status: "ON_SALE" as const,
     },
     {
@@ -90,9 +94,9 @@ async function main() {
         "Apple M4 Pro 芯片 / 18GB 统一内存 / 512GB SSD / Liquid Retina XDR 显示屏 / 17 小时续航",
       price: 14999.0,
       stock: 64,
-      images: JSON.stringify([
+      images: [
         "https://picsum.photos/seed/macbook1/400/400",
-      ]),
+      ],
       status: "ON_SALE" as const,
     },
     {
@@ -103,9 +107,9 @@ async function main() {
         "Intel Core Ultra 7 / 32GB DDR5 / 1TB SSD / 14英寸 2.8K OLED / 重量 1.09kg",
       price: 12999.0,
       stock: 32,
-      images: JSON.stringify([
+      images: [
         "https://picsum.photos/seed/thinkpad1/400/400",
-      ]),
+      ],
       status: "ON_SALE" as const,
     },
     {
@@ -116,9 +120,9 @@ async function main() {
         "变频冷暖 / 自清洁 / 低至 18 分贝 / 适用面积 16-20㎡ / 6 年质保",
       price: 3299.0,
       stock: 200,
-      images: JSON.stringify([
+      images: [
         "https://picsum.photos/seed/ac1/400/400",
-      ]),
+      ],
       status: "ON_SALE" as const,
     },
     {
@@ -129,9 +133,9 @@ async function main() {
         "全直流变频 / 一级能效 / 适用 40-60㎡ / WiFi 智控 / 10 年压缩机保修",
       price: 8999.0,
       stock: 80,
-      images: JSON.stringify([
+      images: [
         "https://picsum.photos/seed/ac2/400/400",
-      ]),
+      ],
       status: "OFF_SHELF" as const,
     },
   ];

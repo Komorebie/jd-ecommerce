@@ -23,6 +23,14 @@ import Link from "next/link";
 
 const { Title, Text, Paragraph } = Typography;
 
+function parseImages(images: unknown): string[] {
+  if (Array.isArray(images)) return images as string[];
+  if (typeof images === "string") {
+    try { return JSON.parse(images); } catch { return []; }
+  }
+  return [];
+}
+
 interface ProductDetail {
   id: number;
   name: string;
@@ -31,7 +39,7 @@ interface ProductDetail {
   stock: number;
   status: string;
   salesCount: number;
-  images: string[];
+  images: string[] | string;
   createdAt: string;
   category: { id: number; name: string };
   merchant: { shopName: string };
@@ -94,6 +102,7 @@ export default function ProductDetailPage() {
   }
 
   const formatPrice = (price: string | number) => `¥${Number(price).toFixed(2)}`;
+  const images = parseImages(product.images);
   const isOnSale = product.status === "ON_SALE" && product.stock > 0;
 
   return (
@@ -113,14 +122,14 @@ export default function ProductDetailPage() {
         <Col xs={24} md={10}>
           <Image.PreviewGroup>
             <Image
-              src={(product.images as string[])?.[mainImage] || "https://picsum.photos/400/400"}
+              src={(images)?.[mainImage] || "https://picsum.photos/400/400"}
               alt={product.name}
               style={{ width: "100%", borderRadius: 8 }}
             />
           </Image.PreviewGroup>
-          {(product.images as string[]).length > 1 && (
+          {(images).length > 1 && (
             <Row gutter={8} style={{ marginTop: 8 }}>
-              {(product.images as string[]).map((img, idx) => (
+              {(images).map((img, idx) => (
                 <Col key={idx} span={6}>
                   <img
                     src={img}
