@@ -14,10 +14,15 @@ import {
   Image,
   Breadcrumb,
   Descriptions,
+  Rate,
+  List,
+  Divider,
+  Space,
 } from "antd";
 import {
   ShoppingCartOutlined,
   ThunderboltOutlined,
+  StarOutlined,
 } from "@ant-design/icons";
 import Link from "next/link";
 
@@ -52,6 +57,7 @@ export default function ProductDetailPage() {
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [mainImage, setMainImage] = useState(0);
+  const [reviews, setReviews] = useState<{ rating: number; content: string | null; createdAt: string; user: { name: string } }[]>([]);
 
   useEffect(() => {
     fetch(`/api/products/${params.id}`)
@@ -62,6 +68,10 @@ export default function ProductDetailPage() {
         }
         setLoading(false);
       });
+
+    fetch(`/api/reviews?productId=${params.id}`)
+      .then((r) => r.json())
+      .then((json) => { if (json.code === 0) setReviews(json.data); });
   }, [params.id]);
 
   const addToCart = async () => {
@@ -203,7 +213,29 @@ export default function ProductDetailPage() {
               >
                 加入购物车
               </Button>
-              <Button size="large" icon={<ThunderboltOutlined />}>
+              <Button
+                size="large"
+                icon={<ThunderboltOutlined />}
+                onClick={async () => {
+                  const res = await fetch("/api/cart", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ productId: product?.id, quantity }),
+                  });
+                  if (res.status === 401) { router.push("/login"); return; }
+                  const json = await res.json();
+                  if (res.ok) {
+                    const cartRes = await fetch("/api/cart");
+                    const cartJson = await cartRes.json();
+                    if (cartJson.code === 0 && cartJson.data.length > 0) {
+                      const cartItem = cartJson.data.find((i: { productId: number }) => i.productId === product?.id);
+                      if (cartItem) router.push(`/orders/create?ids=${cartItem.id}`);
+                    }
+                  } else {
+                    message.error(json.message);
+                  }
+                }}
+              >
                 立即购买
               </Button>
             </div>
@@ -215,6 +247,34 @@ export default function ProductDetailPage() {
           )}
         </Col>
       </Row>
+
+      {/* Reviews */}
+      <div style={{ marginTop: 48 }}>
+        <Divider>
+          <StarOutlined /> 商品评价 ({reviews.length})
+        </Divider>
+        {reviews.length === 0 ? (
+          <div style={{ textAlign: "center", padding: 24, color: "#999" }}>暂无评价</div>
+        ) : (
+          <List
+            dataSource={reviews}
+            renderItem={(r) => (
+              <List.Item>
+                <div>
+                  <Space>
+                    <Text strong>{r.user.name}</Text>
+                    <Rate disabled value={r.rating} style={{ fontSize: 14 }} />
+                  </Space>
+                  {r.content && <div style={{ marginTop: 4, color: "#666" }}>{r.content}</div>}
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    {new Date(r.createdAt).toLocaleDateString("zh-CN")}
+                  </Text>
+                </div>
+              </List.Item>
+            )}
+          />
+        )}
+      </div>
     </div>
   );
 }

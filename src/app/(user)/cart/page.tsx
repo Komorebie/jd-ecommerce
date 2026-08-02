@@ -250,7 +250,7 @@ export default function CartPage() {
                 type="primary"
                 size="large"
                 disabled={selectedIds.size === 0}
-                onClick={() => router.push("/orders/create")}
+                onClick={() => router.push(`/orders/create?ids=${Array.from(selectedIds).join(",")}`)}
               >
                 结算 ({selectedIds.size})
               </Button>

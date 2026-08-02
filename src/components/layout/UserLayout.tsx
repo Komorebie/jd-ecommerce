@@ -19,6 +19,7 @@ import {
   OrderedListOutlined,
   UserOutlined,
   LogoutOutlined,
+  EnvironmentOutlined,
 } from "@ant-design/icons";
 import Link from "next/link";
 
@@ -45,7 +46,8 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
   const userMenu = session
     ? {
         items: [
-          { key: "profile", label: "修改密码", icon: <UserOutlined />, onClick: () => router.push("/profile/change-password") },
+          { key: "addresses", label: "收货地址", icon: <EnvironmentOutlined />, onClick: () => router.push("/profile/addresses") },
+          { key: "password", label: "修改密码", icon: <UserOutlined />, onClick: () => router.push("/profile/change-password") },
           { key: "logout", label: "退出登录", icon: <LogoutOutlined />, onClick: handleLogout },
         ],
       }
