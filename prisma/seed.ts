@@ -26,7 +26,8 @@ async function main() {
     update: {},
     create: {
       email: "merchant@test.com",
-      passwordHash: "$2a$10$dummy",
+      // 测试账号密码：123456（bcrypt 哈希）
+      passwordHash: "$2a$10$FgWVwxTDRB70KzN0Ssqy7um/L4.Fzr4Oh1bHjnWk61sO26I0oLl.C",
       name: "测试商家",
       role: "MERCHANT",
     },

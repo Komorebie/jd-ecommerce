@@ -23,15 +23,34 @@ export async function POST(request: Request) {
 
     const passwordHash = await bcrypt.hash(password, 10);
 
-    const user = await prisma.user.create({
-      data: {
-        email,
-        passwordHash,
-        name,
-        role: role === "MERCHANT" ? "MERCHANT" : "USER",
-      },
-      select: { id: true, email: true, name: true, role: true },
-    });
+    // 商家角色注册时，同时创建店铺记录（状态 PENDING，等待平台审核）
+    // 使用嵌套创建保证用户和店铺同时写入，避免出现"有商家账号无店铺"的状态
+    const user = role === "MERCHANT"
+      ? await prisma.user.create({
+          data: {
+            email,
+            passwordHash,
+            name,
+            role: "MERCHANT",
+            merchant: {
+              create: {
+                shopName: `${name}的店铺`,
+                description: "新入驻店铺，等待平台审核",
+                status: "PENDING",
+              },
+            },
+          },
+          select: { id: true, email: true, name: true, role: true },
+        })
+      : await prisma.user.create({
+          data: {
+            email,
+            passwordHash,
+            name,
+            role: "USER",
+          },
+          select: { id: true, email: true, name: true, role: true },
+        });
 
     return NextResponse.json(
       { code: 0, message: "注册成功", data: user },
