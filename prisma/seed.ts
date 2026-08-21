@@ -24,7 +24,7 @@ async function main() {
   // 平台管理员账号：admin@test.com / 123456（用于管理后台测试）
   await prisma.user.upsert({
     where: { email: "admin@test.com" },
-    update: {},
+    update: { name: "平台管理员", passwordHash: "$2a$10$FgWVwxTDRB70KzN0Ssqy7um/L4.Fzr4Oh1bHjnWk61sO26I0oLl.C" },
     create: {
       email: "admin@test.com",
       // 测试账号密码：123456（bcrypt 哈希）
@@ -37,7 +37,7 @@ async function main() {
   // === Merchant ===
   const merchantUser = await prisma.user.upsert({
     where: { email: "merchant@test.com" },
-    update: {},
+    update: { name: "测试商家", passwordHash: "$2a$10$FgWVwxTDRB70KzN0Ssqy7um/L4.Fzr4Oh1bHjnWk61sO26I0oLl.C" },
     create: {
       email: "merchant@test.com",
       // 测试账号密码：123456（bcrypt 哈希）

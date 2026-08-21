@@ -27,7 +27,7 @@ interface OrderDetail {
   createdAt: string;
   merchant: { shopName: string };
   address: { receiver: string; phone: string; province: string; city: string; district: string; detail: string };
-  items: { productName: string; productImage: string; price: string; quantity: number }[];
+  items: { productId: number; productName: string; productImage: string; price: string; quantity: number }[];
 }
 
 export default function OrderDetailPage() {
@@ -69,8 +69,8 @@ export default function OrderDetailPage() {
       message.success("评价成功");
       setReviewModal(false);
       // Mark item as reviewed
-      const items = order.items.map((i, idx) =>
-        idx === reviewProdId ? { ...i, reviewed: true } : i
+      const items = order.items.map((i) =>
+        i.productId === reviewProdId ? { ...i, reviewed: true } : i
       );
       setOrder({ ...order, items } as OrderDetail);
     } else {
@@ -158,7 +158,7 @@ export default function OrderDetailPage() {
                 <Button
                   type="link"
                   size="small"
-                  onClick={() => { setReviewProdId(idx); setReviewRating(5); setReviewContent(""); setReviewModal(true); }}
+                  onClick={() => { setReviewProdId(item.productId); setReviewRating(5); setReviewContent(""); setReviewModal(true); }}
                   style={{ padding: 0, marginLeft: 8 }}
                 >
                   评价
