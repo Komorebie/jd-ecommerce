@@ -216,3 +216,67 @@ export interface AdminStats {
     userName: string | null;
   }[];
 }
+
+// ========== Merchant ==========
+
+/** 商家端订单列表项（含买家信息和收货地址） */
+export interface MerchantOrderItem {
+  id: number;
+  orderNo: string;
+  totalAmount: number;
+  status: OrderStatus;
+  remark: string | null;
+  paidAt: string | null;
+  shippedAt: string | null;
+  createdAt: string;
+  user: { id: number; name: string; email: string } | null;
+  address: {
+    receiver: string;
+    phone: string;
+    province: string;
+    city: string;
+    district: string;
+    detail: string;
+  } | null;
+  items: {
+    id: number;
+    productName: string;
+    productImage: string;
+    price: number;
+    quantity: number;
+  }[];
+}
+
+/** 商家端退款列表项 */
+export interface MerchantRefundItem {
+  id: number;
+  orderId: number;
+  orderNo: string;
+  userName: string;
+  userEmail: string;
+  reason: string;
+  amount: number;
+  status: "PENDING" | "APPROVED" | "REJECTED" | "CLOSED";
+  rejectReason: string | null;
+  appliedAt: string;
+  resolvedAt: string | null;
+}
+
+/** 商家端仪表盘统计数据 */
+export interface MerchantStats {
+  shopName: string;
+  todayOrderCount: number;
+  totalSales: number;
+  productCount: number;
+  lowStockCount: number;
+  pendingRefundCount: number;
+  pendingShipmentCount: number;
+  recentOrders: {
+    id: number;
+    orderNo: string;
+    totalAmount: number;
+    status: OrderStatus;
+    createdAt: string;
+    userName: string | null;
+  }[];
+}
