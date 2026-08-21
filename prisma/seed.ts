@@ -20,13 +20,28 @@ async function main() {
     prisma.category.create({ data: { name: "空调", parentId: categories[2].id, sortOrder: 1 } }),
   ]);
 
+  // === Admin ===
+  // 平台管理员账号：admin@test.com / 123456（用于管理后台测试）
+  await prisma.user.upsert({
+    where: { email: "admin@test.com" },
+    update: {},
+    create: {
+      email: "admin@test.com",
+      // 测试账号密码：123456（bcrypt 哈希）
+      passwordHash: "$2a$10$FgWVwxTDRB70KzN0Ssqy7um/L4.Fzr4Oh1bHjnWk61sO26I0oLl.C",
+      name: "平台管理员",
+      role: "ADMIN",
+    },
+  });
+
   // === Merchant ===
   const merchantUser = await prisma.user.upsert({
     where: { email: "merchant@test.com" },
     update: {},
     create: {
       email: "merchant@test.com",
-      passwordHash: "$2a$10$dummy",
+      // 测试账号密码：123456（bcrypt 哈希）
+      passwordHash: "$2a$10$FgWVwxTDRB70KzN0Ssqy7um/L4.Fzr4Oh1bHjnWk61sO26I0oLl.C",
       name: "测试商家",
       role: "MERCHANT",
     },
