@@ -52,7 +52,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ code: 1004, message: "订单不存在", data: null }, { status: 404 });
     }
 
-    const allowed = ["PENDING_SHIPMENT", "SHIPPED", "COMPLETED"];
+    const allowed = ["PENDING_SHIPMENT", "SHIPPED"];
     if (!allowed.includes(order.status)) {
       return NextResponse.json({ code: 2002, message: "当前状态不可申请退款", data: null }, { status: 400 });
     }

@@ -186,7 +186,7 @@ export default function OrderDetailPage() {
               <Button danger onClick={() => handleAction("cancel")}>取消订单</Button>
             </>
           )}
-          {(order.status === "PENDING_SHIPMENT" || order.status === "SHIPPED" || order.status === "COMPLETED") && (
+          {(order.status === "PENDING_SHIPMENT" || order.status === "SHIPPED") && (
             <Button danger onClick={openRefund}>申请退款</Button>
           )}
           {order.status === "SHIPPED" && (
