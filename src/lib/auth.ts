@@ -20,6 +20,9 @@ export const authOptions: NextAuthOptions = {
 
         if (!user) return null;
 
+        // 被封禁的账号禁止登录（与 requireAdmin/requireMerchant 的校验保持一致）
+        if (user.status === "BANNED") return null;
+
         const isValid = await bcrypt.compare(
           credentials.password,
           user.passwordHash,
