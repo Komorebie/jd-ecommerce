@@ -25,6 +25,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
         items: true,
         address: { select: { receiver: true, phone: true, province: true, city: true, district: true, detail: true } },
         merchant: { select: { shopName: true } },
+        refunds: { orderBy: { id: "desc" } },
       },
     });
 

@@ -11,9 +11,12 @@ const { Title, Text, Paragraph } = Typography;
 
 // 退款状态中文映射
 const refundStatusMap: Record<string, { color: string; label: string }> = {
-  PENDING: { color: "orange", label: "待裁决" },
-  APPROVED: { color: "green", label: "已同意" },
-  REJECTED: { color: "red", label: "已驳回" },
+  PENDING: { color: "orange", label: "待商家审核" },
+  APPROVED: { color: "blue", label: "商家已同意" },
+  RETURNING: { color: "cyan", label: "退货中" },
+  REFUNDED: { color: "green", label: "已退款" },
+  REJECTED: { color: "red", label: "商家已拒绝" },
+  APPEALING: { color: "purple", label: "用户申诉中" },
   CLOSED: { color: "default", label: "已关闭" },
 };
 
@@ -75,7 +78,7 @@ export default function AdminDisputesPage() {
     <div>
       <Title level={3}>纠纷处理</Title>
       <Text type="secondary" style={{ display: "block", marginBottom: 16 }}>
-        对退款纠纷进行最终裁决。裁决通过则立即退款并恢复库存；裁决驳回则退款关闭，用户不可再申诉。
+        退款纠纷裁决：可对"待商家审核"的退款直接介入，或对用户申诉做最终裁决。裁决通过则立即退款并恢复库存；裁决驳回则流程终结，用户不可再申诉。
       </Text>
 
       {/* 筛选栏 */}
@@ -116,11 +119,15 @@ export default function AdminDisputesPage() {
             title: "退款原因", dataIndex: "reason", ellipsis: true,
           },
           {
+            title: "申诉理由", dataIndex: "appealReason", ellipsis: true,
+            render: (v: string | null) => v || "—",
+          },
+          {
             title: "金额", dataIndex: "amount", width: 110,
             render: (v: string) => <Text strong style={{ color: "#e00" }}>{formatPrice(v)}</Text>,
           },
           {
-            title: "状态", dataIndex: "status", width: 100,
+            title: "状态", dataIndex: "status", width: 120,
             render: (s: string) => <Tag color={refundStatusMap[s]?.color}>{refundStatusMap[s]?.label ?? s}</Tag>,
           },
           {
@@ -130,14 +137,14 @@ export default function AdminDisputesPage() {
           {
             title: "操作", width: 120,
             render: (_: unknown, record: AdminRefundItem) =>
-              record.status === "PENDING" ? (
+              record.status === "PENDING" || record.status === "APPEALING" ? (
                 <Button
                   size="small"
                   type="primary"
                   danger
                   onClick={() => { setCurrentRefund(record); setModalOpen(true); }}
                 >
-                  裁决
+                  {record.status === "APPEALING" ? "裁决申诉" : "裁决"}
                 </Button>
               ) : (
                 <Text type="secondary">—</Text>
@@ -165,12 +172,20 @@ export default function AdminDisputesPage() {
             <Paragraph>
               <Text strong>退款原因：</Text>{currentRefund.reason}
             </Paragraph>
+            {currentRefund.appealReason && (
+              <Paragraph>
+                <Text strong>用户申诉理由：</Text>
+                <Text type="danger">{currentRefund.appealReason}</Text>
+              </Paragraph>
+            )}
             <Paragraph>
               <Text strong>退款金额：</Text>
               <Text strong style={{ color: "#e00" }}>{formatPrice(currentRefund.amount)}</Text>
             </Paragraph>
             <Text type="secondary" style={{ display: "block", marginBottom: 16 }}>
-              裁决为最终决定：通过 → 立即退款并恢复库存；驳回 → 退款关闭，用户不可再申诉。
+              {currentRefund.status === "APPEALING"
+                ? "申诉裁决为最终决定：通过 → 立即退款并恢复库存；驳回 → 流程终结，用户不可再申诉。"
+                : "裁决为最终决定：通过 → 立即退款并恢复库存；驳回 → 流程终结。"}
             </Text>
             <Space>
               <Button
