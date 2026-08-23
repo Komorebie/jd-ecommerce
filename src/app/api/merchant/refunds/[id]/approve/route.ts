@@ -1,4 +1,5 @@
-// 商家端同意退款接口：同意后订单变更为已退款，恢复库存
+// 商家端同意退款接口：同意后进入退货流程，等待用户寄回商品（7天内）
+// 后续流程：用户寄回(RETURNING) → 商家确认收货(confirm-receipt) → 退款完成+恢复库存
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -17,7 +18,7 @@ export async function PUT(_request: Request, { params }: { params: { id: string 
     const refundId = Number(params.id);
     const refund = await prisma.refund.findUnique({
       where: { id: refundId },
-      include: { order: { include: { items: true } } },
+      include: { order: true },
     });
 
     if (!refund) {
@@ -32,25 +33,13 @@ export async function PUT(_request: Request, { params }: { params: { id: string 
       return NextResponse.json({ code: 2002, message: "该退款申请已处理，不可重复操作", data: null }, { status: 400 });
     }
 
-    // 事务：退款生效 + 订单变更为已退款 + 恢复库存
-    await prisma.$transaction(async (tx) => {
-      await tx.refund.update({
-        where: { id: refundId },
-        data: { status: "APPROVED", resolvedAt: new Date() },
-      });
-      await tx.order.update({
-        where: { id: refund.orderId },
-        data: { status: "REFUNDED" },
-      });
-      for (const item of refund.order.items) {
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { stock: { increment: item.quantity } },
-        });
-      }
+    // 商家同意：退款状态变更为"已同意"，等待用户寄回商品
+    await prisma.refund.update({
+      where: { id: refundId },
+      data: { status: "APPROVED", resolvedAt: new Date() },
     });
 
-    return NextResponse.json({ code: 0, message: "已同意退款，库存已恢复", data: null });
+    return NextResponse.json({ code: 0, message: "已同意退款，等待用户寄回商品（7天内）", data: null });
   } catch {
     return NextResponse.json({ code: 3001, message: "服务器内部错误", data: null }, { status: 500 });
   }

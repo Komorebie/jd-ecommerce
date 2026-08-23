@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { autoCloseExpiredRefunds, isRefundActive } from "@/lib/refund";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,9 @@ export async function GET() {
     if (!userId) {
       return NextResponse.json({ code: 1002, message: "请先登录", data: null }, { status: 401 });
     }
+
+    // 懒执行超时处理：超过 7 天未寄回的退款自动关闭
+    await autoCloseExpiredRefunds();
 
     const refunds = await prisma.refund.findMany({
       where: { userId },
@@ -61,7 +65,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ code: 2003, message: "退款金额不能超过实付金额", data: null }, { status: 400 });
     }
 
-    const existing = order.refunds.find((r) => r.status === "PENDING");
+    const existing = order.refunds.find((r) => isRefundActive(r.status));
     if (existing) {
       return NextResponse.json({ code: 2002, message: "已有一个处理中的退款申请", data: null }, { status: 400 });
     }

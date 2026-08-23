@@ -86,6 +86,11 @@ export interface RefundRequest {
   amount: number;
 }
 
+/** 用户申诉请求：退款被商家拒绝后提交申诉理由 */
+export interface RefundAppealRequest {
+  appealReason: string;
+}
+
 export interface RefundResponse {
   id: number;
   orderId: number;
@@ -94,8 +99,9 @@ export interface RefundResponse {
   userName: string;
   reason: string;
   amount: number;
-  status: "PENDING" | "APPROVED" | "REJECTED" | "CLOSED";
+  status: "PENDING" | "APPROVED" | "RETURNING" | "REFUNDED" | "REJECTED" | "APPEALING" | "CLOSED";
   rejectReason?: string;
+  appealReason?: string;
   appliedAt: string;
   resolvedAt?: string;
 }
@@ -192,8 +198,9 @@ export interface AdminRefundItem {
   userEmail: string;
   reason: string;
   amount: number;
-  status: "PENDING" | "APPROVED" | "REJECTED" | "CLOSED";
+  status: "PENDING" | "APPROVED" | "RETURNING" | "REFUNDED" | "REJECTED" | "APPEALING" | "CLOSED";
   rejectReason: string | null;
+  appealReason: string | null;
   appliedAt: string;
   resolvedAt: string | null;
 }
@@ -256,8 +263,9 @@ export interface MerchantRefundItem {
   userEmail: string;
   reason: string;
   amount: number;
-  status: "PENDING" | "APPROVED" | "REJECTED" | "CLOSED";
+  status: "PENDING" | "APPROVED" | "RETURNING" | "REFUNDED" | "REJECTED" | "APPEALING" | "CLOSED";
   rejectReason: string | null;
+  appealReason: string | null;
   appliedAt: string;
   resolvedAt: string | null;
 }
