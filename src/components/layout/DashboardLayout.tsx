@@ -23,6 +23,7 @@ import {
   LogoutOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  CommentOutlined,
 } from "@ant-design/icons";
 import Link from "next/link";
 
@@ -39,6 +40,7 @@ const merchantMenu = [
   { key: "/merchant/products", label: <Link href="/merchant/products">商品管理</Link>, icon: <ShopOutlined /> },
   { key: "/merchant/orders", label: <Link href="/merchant/orders">订单管理</Link>, icon: <OrderedListOutlined /> },
   { key: "/merchant/refunds", label: <Link href="/merchant/refunds">退款处理</Link>, icon: <RollbackOutlined /> },
+  { key: "/merchant/reviews", label: <Link href="/merchant/reviews">评价管理</Link>, icon: <CommentOutlined /> },
 ];
 
 const adminMenu = [

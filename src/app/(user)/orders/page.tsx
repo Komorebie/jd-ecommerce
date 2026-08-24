@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Table, Button, Tag, Typography, Space, Spin, Empty, message } from "antd";
+import { Table, Button, Tag, Typography, Space, Spin, Empty, message, Popconfirm } from "antd";
 import Link from "next/link";
 
 const { Title, Text } = Typography;
@@ -51,6 +51,42 @@ export default function OrdersPage() {
     }
   };
 
+  // 再次购买：将订单内所有商品重新加入购物车
+  const buyAgain = async (order: Record<string, unknown>) => {
+    const items = order.items as { productId: number; quantity: number }[] | undefined;
+    if (!items?.length) return;
+    let ok = true;
+    for (const item of items) {
+      const res = await fetch("/api/cart", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId: item.productId, quantity: item.quantity }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        message.error(json.message || "加入购物车失败");
+        ok = false;
+        break;
+      }
+    }
+    if (ok) {
+      message.success("已加入购物车，去结算吧");
+      router.push("/cart");
+    }
+  };
+
+  // 删除订单记录（软删除，仅已取消订单）
+  const handleDelete = async (id: number) => {
+    const res = await fetch(`/api/orders/${id}`, { method: "DELETE" });
+    const json = await res.json();
+    if (res.ok) {
+      message.success(json.message);
+      setOrders((prev) => prev.filter((o) => o.id !== id));
+    } else {
+      message.error(json.message);
+    }
+  };
+
   if (loading) return <div style={{ textAlign: "center", padding: 100 }}><Spin size="large" /></div>;
 
   return (
@@ -90,6 +126,18 @@ export default function OrdersPage() {
                   )}
                   {r.status === "SHIPPED" && (
                     <Button type="link" size="small" onClick={() => handleAction(r.id as number, "confirm")}>确认收货</Button>
+                  )}
+                  {r.status === "COMPLETED" && (
+                    <Button type="link" size="small" onClick={() => buyAgain(r)}>再次购买</Button>
+                  )}
+                  {r.status === "CANCELLED" && (
+                    <Popconfirm
+                      title="删除该订单记录？"
+                      description="删除后不可恢复"
+                      onConfirm={() => handleDelete(r.id as number)}
+                    >
+                      <Button type="link" size="small" danger>删除记录</Button>
+                    </Popconfirm>
                   )}
                 </Space>
               ),

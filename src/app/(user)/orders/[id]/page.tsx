@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Button, Card, Typography, Descriptions, Tag, Spin, message, Divider, Row, Col, Space, Modal, Input, InputNumber, Rate, Alert } from "antd";
+import { Button, Card, Typography, Descriptions, Tag, Spin, message, Divider, Row, Col, Space, Modal, Input, InputNumber, Rate, Alert, Popconfirm, Timeline } from "antd";
 import Link from "next/link";
 
 const { Title, Text } = Typography;
@@ -39,6 +39,7 @@ interface RefundItem {
   appealReason: string | null;
   appliedAt: string;
   resolvedAt: string | null;
+  timeline?: { status: string; note: string; time: string }[];
 }
 
 interface OrderDetail {
@@ -48,6 +49,7 @@ interface OrderDetail {
   status: string;
   paidAt: string | null;
   shippedAt: string | null;
+  trackingNo: string | null;
   createdAt: string;
   merchant: { shopName: string };
   address: { receiver: string; phone: string; province: string; city: string; district: string; detail: string };
@@ -195,6 +197,44 @@ export default function OrderDetailPage() {
     setRefundModal(true);
   };
 
+  // 再次购买：将订单内所有商品重新加入购物车
+  const buyAgain = async () => {
+    if (!order) return;
+    setSubmitting(true);
+    let ok = true;
+    for (const item of order.items) {
+      const res = await fetch("/api/cart", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId: item.productId, quantity: item.quantity }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        message.error(json.message || "加入购物车失败");
+        ok = false;
+        break;
+      }
+    }
+    setSubmitting(false);
+    if (ok) {
+      message.success("已加入购物车，去结算吧");
+      router.push("/cart");
+    }
+  };
+
+  // 删除订单记录（软删除，仅已取消订单）
+  const handleDeleteOrder = async () => {
+    if (!order) return;
+    const res = await fetch(`/api/orders/${order.id}`, { method: "DELETE" });
+    const json = await res.json();
+    if (res.ok) {
+      message.success(json.message);
+      router.push("/orders");
+    } else {
+      message.error(json.message);
+    }
+  };
+
   if (loading) return <div style={{ textAlign: "center", padding: 100 }}><Spin size="large" /></div>;
   if (!order) return <div style={{ textAlign: "center", padding: 100 }}><Title level={4}>订单不存在</Title></div>;
 
@@ -234,6 +274,30 @@ export default function OrderDetailPage() {
             )}
           </Descriptions>
 
+          {/* 退款全流程时间线 */}
+          {activeRefund.timeline && activeRefund.timeline.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <Divider orientation="left" style={{ margin: "8px 0" }}>
+                <Text strong>退款全流程</Text>
+              </Divider>
+              <Timeline
+                items={activeRefund.timeline.map((ev) => ({
+                  color: ev.status === "REFUNDED" ? "green" : ev.status === "CLOSED" || ev.status === "REJECTED" ? "red" : "blue",
+                  children: (
+                    <div>
+                      <Text>{ev.note}</Text>
+                      <div>
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                          {new Date(ev.time).toLocaleString("zh-CN")}
+                        </Text>
+                      </div>
+                    </div>
+                  ),
+                }))}
+              />
+            </div>
+          )}
+
           {/* 退款操作指引 */}
           {activeRefund.status === "PENDING" && (
             <Alert type="info" showIcon message="等待商家审核中。若商家 48 小时内未处理，可联系平台客服介入。" style={{ marginBottom: 12 }} />
@@ -271,6 +335,33 @@ export default function OrderDetailPage() {
       <Card title="收货信息" style={{ marginBottom: 16 }}>
         <Text>{order.address.receiver} {order.address.phone} &nbsp; {order.address.province}{order.address.city}{order.address.district} {order.address.detail}</Text>
       </Card>
+
+      {/* 物流信息卡片：已发货/已完成且填写了物流单号时展示 */}
+      {order.trackingNo && (
+        <Card title="物流信息" style={{ marginBottom: 16 }}>
+          <Descriptions column={1} size="small" style={{ marginBottom: 8 }}>
+            <Descriptions.Item label="物流单号">{order.trackingNo}</Descriptions.Item>
+            <Descriptions.Item label="承运商">京东物流</Descriptions.Item>
+          </Descriptions>
+          <Timeline
+            items={[
+              {
+                color: order.status === "SHIPPED" ? "blue" : "green",
+                children: (
+                  <div>
+                    <Text>{order.status === "SHIPPED" ? "商品已发出，正在配送途中" : "商品已送达"}</Text>
+                    <div>
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        {order.shippedAt ? new Date(order.shippedAt).toLocaleString("zh-CN") : "—"}
+                      </Text>
+                    </div>
+                  </div>
+                ),
+              },
+            ]}
+          />
+        </Card>
+      )}
 
       <Card title="商品清单">
         {order.items.map((item, idx) => (
@@ -317,6 +408,18 @@ export default function OrderDetailPage() {
           )}
           {order.status === "SHIPPED" && (
             <Button type="primary" onClick={() => handleAction("confirm")}>确认收货</Button>
+          )}
+          {order.status === "COMPLETED" && (
+            <Button type="primary" onClick={buyAgain} loading={submitting}>再次购买</Button>
+          )}
+          {order.status === "CANCELLED" && (
+            <Popconfirm
+              title="删除该订单记录？"
+              description="删除后不可恢复"
+              onConfirm={handleDeleteOrder}
+            >
+              <Button danger>删除记录</Button>
+            </Popconfirm>
           )}
         </Space>
       </div>

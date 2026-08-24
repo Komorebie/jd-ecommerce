@@ -3,7 +3,7 @@
 // 商家订单管理页面：查看本店订单、确认发货
 
 import { useCallback, useEffect, useState } from "react";
-import { Table, Tag, Input, Select, Space, Button, Popconfirm, message, Typography, Modal } from "antd";
+import { Table, Tag, Input, Select, Space, Button, Popconfirm, message, Typography, Modal, Form } from "antd";
 import type { MerchantOrderItem } from "@/types/api";
 
 const { Title, Text } = Typography;
@@ -33,6 +33,9 @@ export default function MerchantOrdersPage() {
   const [status, setStatus] = useState<string | undefined>(undefined);
   // 详情弹窗
   const [detailOrder, setDetailOrder] = useState<MerchantOrderItem | null>(null);
+  // 发货弹窗
+  const [shipOrder, setShipOrder] = useState<MerchantOrderItem | null>(null);
+  const [shipForm] = Form.useForm<{ trackingNo: string }>();
 
   // 拉取本店订单列表
   const fetchOrders = useCallback(async () => {
@@ -55,11 +58,18 @@ export default function MerchantOrdersPage() {
 
   // 确认发货
   const handleShip = async (id: number) => {
-    const res = await fetch(`/api/merchant/orders/${id}/ship`, { method: "PUT" });
+    const values = await shipForm.validateFields();
+    const res = await fetch(`/api/merchant/orders/${id}/ship`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ trackingNo: values.trackingNo }),
+    });
     const json = await res.json();
     if (json.code === 0) {
       message.success(json.message);
+      setShipOrder(null);
       setDetailOrder(null);
+      shipForm.resetFields();
       fetchOrders();
     } else {
       message.error(json.message);
@@ -127,13 +137,9 @@ export default function MerchantOrdersPage() {
               <Space>
                 <Button size="small" type="link" onClick={() => setDetailOrder(record)}>详情</Button>
                 {record.status === "PENDING_SHIPMENT" && (
-                  <Popconfirm
-                    title="确认发货？"
-                    description="发货后订单状态将变为已发货"
-                    onConfirm={() => handleShip(record.id)}
-                  >
-                    <Button size="small" type="primary">发货</Button>
-                  </Popconfirm>
+                  <Button size="small" type="primary" onClick={() => { setShipOrder(record); shipForm.resetFields(); }}>
+                    发货
+                  </Button>
                 )}
               </Space>
             ),
@@ -148,12 +154,9 @@ export default function MerchantOrdersPage() {
         onCancel={() => setDetailOrder(null)}
         footer={
           detailOrder?.status === "PENDING_SHIPMENT" ? (
-            <Popconfirm
-              title="确认发货？"
-              onConfirm={() => handleShip(detailOrder.id)}
-            >
-              <Button type="primary">确认发货</Button>
-            </Popconfirm>
+            <Button type="primary" onClick={() => { setShipOrder(detailOrder); shipForm.resetFields(); }}>
+              确认发货
+            </Button>
           ) : null
         }
         width={620}
@@ -174,6 +177,7 @@ export default function MerchantOrdersPage() {
                   : ""}
               </div>
               {detailOrder.remark && <div>买家备注：{detailOrder.remark}</div>}
+              {detailOrder.trackingNo && <div>物流单号：{detailOrder.trackingNo}</div>}
             </div>
             {/* 商品明细 */}
             <Text strong>商品明细</Text>
@@ -215,6 +219,27 @@ export default function MerchantOrdersPage() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* 发货弹窗：填写物流单号 */}
+      <Modal
+        title={`确认发货 - ${shipOrder?.orderNo ?? ""}`}
+        open={!!shipOrder}
+        onCancel={() => setShipOrder(null)}
+        onOk={() => shipOrder && handleShip(shipOrder.id)}
+        okText="确认发货"
+        width={480}
+      >
+        <Form form={shipForm} layout="vertical">
+          <Form.Item
+            name="trackingNo"
+            label="物流单号"
+            rules={[{ required: true, message: "请输入物流单号" }]}
+            extra="发货后订单状态将变为已发货，用户可查看物流信息"
+          >
+            <Input placeholder="例如：SF1234567890" maxLength={40} />
+          </Form.Item>
+        </Form>
       </Modal>
     </div>
   );

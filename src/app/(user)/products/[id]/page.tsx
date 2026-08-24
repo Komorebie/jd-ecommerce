@@ -57,7 +57,7 @@ export default function ProductDetailPage() {
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [mainImage, setMainImage] = useState(0);
-  const [reviews, setReviews] = useState<{ rating: number; content: string | null; createdAt: string; user: { name: string } }[]>([]);
+  const [reviews, setReviews] = useState<{ rating: number; content: string | null; merchantReply: string | null; createdAt: string; user: { name: string } }[]>([]);
 
   useEffect(() => {
     fetch(`/api/products/${params.id}`)
@@ -266,6 +266,12 @@ export default function ProductDetailPage() {
                     <Rate disabled value={r.rating} style={{ fontSize: 14 }} />
                   </Space>
                   {r.content && <div style={{ marginTop: 4, color: "#666" }}>{r.content}</div>}
+                  {r.merchantReply && (
+                    <div style={{ marginTop: 8, padding: "8px 12px", background: "#f6f6f6", borderRadius: 6 }}>
+                      <Text style={{ color: "#1677ff", fontSize: 13 }}>商家回复：</Text>
+                      <Text style={{ color: "#666", fontSize: 13 }}>{r.merchantReply}</Text>
+                    </div>
+                  )}
                   <Text type="secondary" style={{ fontSize: 12 }}>
                     {new Date(r.createdAt).toLocaleDateString("zh-CN")}
                   </Text>
