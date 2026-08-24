@@ -41,10 +41,13 @@ enum OrderStatus {
 }
 
 enum RefundStatus {
-  PENDING
-  APPROVED
-  REJECTED
-  CLOSED
+  PENDING // 待商家审核
+  APPROVED // 商家已同意，待用户寄回
+  RETURNING // 用户已寄回，待商家确认收货
+  REFUNDED // 已退款（终态）
+  REJECTED // 商家已拒绝（用户可申诉）
+  APPEALING // 用户申诉中，待管理员裁决
+  CLOSED // 已关闭（用户撤销 / 超时未寄回 / 申诉被驳回）
 }
 
 model User {
@@ -209,6 +212,7 @@ model Refund {
   amount      Decimal      @db.Decimal(10, 2)
   status      RefundStatus @default(PENDING)
   rejectReason String?
+  appealReason String? // 用户申诉理由
   appliedAt   DateTime     @default(now())
   resolvedAt  DateTime?
   createdAt   DateTime     @default(now())

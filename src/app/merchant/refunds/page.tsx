@@ -12,8 +12,11 @@ const { TextArea } = Input;
 // 退款状态中文映射
 const refundStatusMap: Record<string, { color: string; label: string }> = {
   PENDING: { color: "orange", label: "待审核" },
-  APPROVED: { color: "green", label: "已同意" },
+  APPROVED: { color: "blue", label: "已同意，待用户寄回" },
+  RETURNING: { color: "cyan", label: "用户已寄回" },
+  REFUNDED: { color: "green", label: "已退款" },
   REJECTED: { color: "red", label: "已拒绝" },
+  APPEALING: { color: "purple", label: "用户申诉中" },
   CLOSED: { color: "default", label: "已关闭" },
 };
 
@@ -52,9 +55,21 @@ export default function MerchantRefundsPage() {
     fetchRefunds();
   }, [fetchRefunds]);
 
-  // 同意退款
+  // 同意退款（进入退货流程，等待用户寄回）
   const handleApprove = async (id: number) => {
     const res = await fetch(`/api/merchant/refunds/${id}/approve`, { method: "PUT" });
+    const json = await res.json();
+    if (json.code === 0) {
+      message.success(json.message);
+      fetchRefunds();
+    } else {
+      message.error(json.message);
+    }
+  };
+
+  // 确认收货（用户寄回后，确认收货完成退款）
+  const handleConfirmReceipt = async (id: number) => {
+    const res = await fetch(`/api/merchant/refunds/${id}/confirm-receipt`, { method: "PUT" });
     const json = await res.json();
     if (json.code === 0) {
       message.success(json.message);
@@ -129,11 +144,15 @@ export default function MerchantRefundsPage() {
             title: "退款原因", dataIndex: "reason", ellipsis: true,
           },
           {
+            title: "申诉理由", dataIndex: "appealReason", ellipsis: true,
+            render: (v: string | null) => v || "—",
+          },
+          {
             title: "金额", dataIndex: "amount", width: 110,
             render: (v: string) => <Text strong style={{ color: "#e00" }}>{formatPrice(v)}</Text>,
           },
           {
-            title: "状态", dataIndex: "status", width: 100,
+            title: "状态", dataIndex: "status", width: 150,
             render: (s: string) => <Tag color={refundStatusMap[s]?.color}>{refundStatusMap[s]?.label ?? s}</Tag>,
           },
           {
@@ -142,21 +161,31 @@ export default function MerchantRefundsPage() {
           },
           {
             title: "操作", width: 160,
-            render: (_: unknown, record: MerchantRefundItem) =>
-              record.status === "PENDING" ? (
-                <Space>
-                  <Button size="small" type="primary" onClick={() => handleApprove(record.id)}>同意</Button>
-                  <Button
-                    size="small"
-                    danger
-                    onClick={() => { setCurrentRefund(record); setRejectModalOpen(true); }}
-                  >
-                    拒绝
-                  </Button>
-                </Space>
-              ) : (
-                <Text type="secondary">—</Text>
-              ),
+            render: (_: unknown, record: MerchantRefundItem) => (
+              <>
+                {record.status === "PENDING" && (
+                  <Space>
+                    <Button size="small" type="primary" onClick={() => handleApprove(record.id)}>同意</Button>
+                    <Button
+                      size="small"
+                      danger
+                      onClick={() => { setCurrentRefund(record); setRejectModalOpen(true); }}
+                    >
+                      拒绝
+                    </Button>
+                  </Space>
+                )}
+                {record.status === "RETURNING" && (
+                  <Button size="small" type="primary" onClick={() => handleConfirmReceipt(record.id)}>确认收货</Button>
+                )}
+                {record.status === "APPEALING" && (
+                  <Text type="secondary">等待平台裁决</Text>
+                )}
+                {!["PENDING", "RETURNING", "APPEALING"].includes(record.status) && (
+                  <Text type="secondary">—</Text>
+                )}
+              </>
+            ),
           },
         ]}
       />

@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin, parsePagination } from "@/lib/admin";
+import { autoCloseExpiredRefunds } from "@/lib/refund";
 import type { RefundStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +15,9 @@ export async function GET(request: Request) {
     if (!admin) {
       return NextResponse.json({ code: 1003, message: "无权限访问", data: null }, { status: 403 });
     }
+
+    // 懒执行超时处理：超过 7 天未寄回的退款自动关闭
+    await autoCloseExpiredRefunds();
 
     const { searchParams } = new URL(request.url);
     const keyword = searchParams.get("keyword")?.trim() || "";
@@ -60,6 +64,7 @@ export async function GET(request: Request) {
       amount: r.amount,
       status: r.status,
       rejectReason: r.rejectReason,
+      appealReason: r.appealReason,
       appliedAt: r.appliedAt,
       resolvedAt: r.resolvedAt,
     }));
