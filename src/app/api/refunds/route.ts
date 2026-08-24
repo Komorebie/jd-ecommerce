@@ -77,32 +77,47 @@ export async function POST(request: Request) {
       { status: refundStatus, note: refundStatus === "APPROVED" ? "未发货订单，退款自动通过" : "用户提交退款申请，等待商家审核", time: now.toISOString() },
     ];
 
-    const refund = await prisma.refund.create({
-      data: {
-        orderId,
-        userId,
-        reason,
-        amount,
-        status: refundStatus,
-        timeline: initialTimeline,
-      },
-    });
-
-    // Update order status
-    await prisma.order.update({
-      where: { id: orderId },
-      data: { status: refundStatus === "APPROVED" ? "REFUNDED" : "REFUNDING" },
-    });
-
-    // Restore stock
-    if (refundStatus === "APPROVED") {
-      const orderItems = await prisma.orderItem.findMany({ where: { orderId } });
-      for (let i = 0; i < orderItems.length; i++) {
-        await prisma.product.update({
-          where: { id: orderItems[i].productId },
-          data: { stock: { increment: orderItems[i].quantity } },
+    // 事务 + 乐观锁：条件更新订单状态，防止与并发操作（如商家发货）互相覆盖
+    let refund;
+    try {
+      refund = await prisma.$transaction(async (tx) => {
+        const updated = await tx.order.updateMany({
+          where: { id: orderId, status: order.status },
+          data: { status: refundStatus === "APPROVED" ? "REFUNDED" : "REFUNDING" },
         });
+        if (updated.count === 0) {
+          throw new Error("ORDER_STATE_CHANGED");
+        }
+
+        const created = await tx.refund.create({
+          data: {
+            orderId,
+            userId,
+            reason,
+            amount,
+            status: refundStatus,
+            timeline: initialTimeline,
+          },
+        });
+
+        // Restore stock（未发货自动退款时恢复）
+        if (refundStatus === "APPROVED") {
+          const orderItems = await tx.orderItem.findMany({ where: { orderId } });
+          for (let i = 0; i < orderItems.length; i++) {
+            await tx.product.update({
+              where: { id: orderItems[i].productId },
+              data: { stock: { increment: orderItems[i].quantity } },
+            });
+          }
+        }
+
+        return created;
+      });
+    } catch (e) {
+      if (e instanceof Error && e.message === "ORDER_STATE_CHANGED") {
+        return NextResponse.json({ code: 2002, message: "订单状态已变化，请刷新后重试", data: null }, { status: 400 });
       }
+      throw e;
     }
 
     return NextResponse.json({

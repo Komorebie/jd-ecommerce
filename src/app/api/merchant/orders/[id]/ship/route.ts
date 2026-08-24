@@ -15,7 +15,10 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     }
 
     const orderId = Number(params.id);
-    const order = await prisma.order.findUnique({ where: { id: orderId } });
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: { id: true, merchantId: true },
+    });
 
     if (!order) {
       return NextResponse.json({ code: 1004, message: "订单不存在", data: null }, { status: 404 });
@@ -24,17 +27,17 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     if (order.merchantId !== merchant.id) {
       return NextResponse.json({ code: 1003, message: "无权操作该订单", data: null }, { status: 403 });
     }
-    // 状态校验：仅待发货订单可发货
-    if (order.status !== "PENDING_SHIPMENT") {
-      return NextResponse.json({ code: 2002, message: "当前订单状态不可发货", data: null }, { status: 400 });
-    }
 
     const { trackingNo } = (await request.json().catch(() => ({}))) as { trackingNo?: string };
 
-    await prisma.order.update({
-      where: { id: orderId },
+    // 乐观锁：条件更新，仅待发货订单可发货，防止与并发请求（如退款）互相覆盖
+    const result = await prisma.order.updateMany({
+      where: { id: orderId, status: "PENDING_SHIPMENT" },
       data: { status: "SHIPPED", shippedAt: new Date(), trackingNo: trackingNo?.trim() || null },
     });
+    if (result.count === 0) {
+      return NextResponse.json({ code: 2002, message: "当前订单状态不可发货", data: null }, { status: 400 });
+    }
 
     return NextResponse.json({ code: 0, message: "发货成功", data: null });
   } catch {

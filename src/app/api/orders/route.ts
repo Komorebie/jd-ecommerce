@@ -65,13 +65,6 @@ export async function POST(request: Request) {
     const byMerchant = new Map<number, typeof cartItems>();
     for (let i = 0; i < cartItems.length; i++) {
       const item = cartItems[i];
-      if (item.product.stock < item.quantity) {
-        return NextResponse.json({
-          code: 2001,
-          message: `"${item.product.name}" 库存不足`,
-          data: null,
-        }, { status: 400 });
-      }
       const list = byMerchant.get(item.product.merchantId) || [];
       list.push(item);
       byMerchant.set(item.product.merchantId, list);
@@ -79,48 +72,68 @@ export async function POST(request: Request) {
 
     const orderNo = `${new Date().toISOString().slice(0, 10).replace(/-/g, "")}${Math.floor(Math.random() * 10000).toString().padStart(4, "0")}`;
 
-    // Create one order per merchant
-    const orders = [];
-    const merchantKeys = Array.from(byMerchant.keys());
-    for (let m = 0; m < merchantKeys.length; m++) {
-      const merchantId = merchantKeys[m];
-      const items = byMerchant.get(merchantId)!;
-      const totalAmount = items.reduce((sum, i) => sum + Number(i.product.price) * i.quantity, 0);
+    // 事务 + 条件扣减库存（防超卖）：创建订单、扣库存、清购物车整体原子
+    let orders: unknown[] = [];
+    try {
+      orders = await prisma.$transaction(async (tx) => {
+        const created: unknown[] = [];
+        const merchantKeys = Array.from(byMerchant.keys());
+        for (let m = 0; m < merchantKeys.length; m++) {
+          const merchantId = merchantKeys[m];
+          const items = byMerchant.get(merchantId)!;
+          const totalAmount = items.reduce((sum, i) => sum + Number(i.product.price) * i.quantity, 0);
 
-      const order = await prisma.order.create({
-        data: {
-          orderNo: `${orderNo}_${merchantId}`,
-          userId,
-          merchantId,
-          addressId,
-          totalAmount,
-          items: {
-            create: items.map((i) => ({
-              productId: i.productId,
-              productName: i.product.name,
-              productImage: (i.product.images as string[])?.[0] || "",
-              price: i.product.price,
-              quantity: i.quantity,
-            })),
-          },
-        },
-        include: { items: true },
+          const order = await tx.order.create({
+            data: {
+              orderNo: `${orderNo}_${merchantId}`,
+              userId,
+              merchantId,
+              addressId,
+              totalAmount,
+              items: {
+                create: items.map((i) => ({
+                  productId: i.productId,
+                  productName: i.product.name,
+                  productImage: (i.product.images as string[])?.[0] || "",
+                  price: i.product.price,
+                  quantity: i.quantity,
+                })),
+              },
+            },
+            include: { items: true },
+          });
+
+          // 条件扣减：仅当库存充足时扣减，并发下防止超卖
+          for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            const result = await tx.product.updateMany({
+              where: { id: item.productId, stock: { gte: item.quantity } },
+              data: { stock: { decrement: item.quantity } },
+            });
+            if (result.count === 0) {
+              throw new Error(`INSUFFICIENT_STOCK:${item.product.name}`);
+            }
+          }
+
+          created.push(order);
+        }
+
+        // Clear cart items
+        await tx.cartItem.deleteMany({ where: { id: { in: cartItemIds } } });
+
+        return created;
       });
-
-      // Deduct stock
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        await prisma.product.update({
-          where: { id: item.productId },
-          data: { stock: { decrement: item.quantity } },
-        });
+    } catch (e) {
+      if (e instanceof Error && e.message.startsWith("INSUFFICIENT_STOCK:")) {
+        const productName = e.message.slice("INSUFFICIENT_STOCK:".length);
+        return NextResponse.json({
+          code: 2001,
+          message: `"${productName}" 库存不足`,
+          data: null,
+        }, { status: 400 });
       }
-
-      orders.push(order);
+      throw e;
     }
-
-    // Clear cart items
-    await prisma.cartItem.deleteMany({ where: { id: { in: cartItemIds } } });
 
     return NextResponse.json({ code: 0, message: "下单成功", data: orders }, { status: 201 });
   } catch (e) {

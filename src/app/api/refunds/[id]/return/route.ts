@@ -34,34 +34,40 @@ export async function PUT(_request: Request, { params }: { params: { id: string 
     if (refund.userId !== user.id) {
       return NextResponse.json({ code: 1003, message: "无权操作该退款申请", data: null }, { status: 403 });
     }
-    // 状态校验：仅"商家已同意"状态可寄回
-    if (refund.status !== "APPROVED") {
-      return NextResponse.json({ code: 2002, message: "当前状态不可寄回商品", data: null }, { status: 400 });
-    }
     // 时限校验：商家同意后超过 7 天未寄回，自动关闭
     const agreedAt = refund.resolvedAt ? new Date(refund.resolvedAt).getTime() : Date.now();
     if (Date.now() - agreedAt > RETURN_DEADLINE_MS) {
       await prisma.$transaction(async (tx) => {
-        await tx.refund.update({
-          where: { id: refundId },
+        const closed = await tx.refund.updateMany({
+          where: { id: refundId, status: "APPROVED" },
           data: { status: "CLOSED", rejectReason: "超过 7 天未寄回商品，退款申请已自动关闭" },
         });
-        await appendRefundEvent(tx, refundId, "CLOSED", "超过 7 天未寄回商品，退款自动关闭");
-        await tx.order.update({
-          where: { id: refund.orderId },
-          data: { status: computeRevertStatus(refund.order) },
-        });
+        if (closed.count > 0) {
+          await appendRefundEvent(tx, refundId, "CLOSED", "超过 7 天未寄回商品，退款自动关闭");
+          await tx.order.update({
+            where: { id: refund.orderId },
+            data: { status: computeRevertStatus(refund.order) },
+          });
+        }
       });
       return NextResponse.json({ code: 2004, message: "已超过 7 天寄回期限，退款申请已自动关闭", data: null }, { status: 400 });
     }
 
+    // 事务 + 乐观锁：条件更新，仅"商家已同意"状态可寄回
+    let ok = false;
     await prisma.$transaction(async (tx) => {
-      await tx.refund.update({
-        where: { id: refundId },
+      const result = await tx.refund.updateMany({
+        where: { id: refundId, status: "APPROVED" },
         data: { status: "RETURNING" },
       });
+      if (result.count === 0) return;
+      ok = true;
       await appendRefundEvent(tx, refundId, "RETURNING", "用户已寄回商品，等待商家确认收货");
     });
+
+    if (!ok) {
+      return NextResponse.json({ code: 2002, message: "当前状态不可寄回商品", data: null }, { status: 400 });
+    }
 
     return NextResponse.json({ code: 0, message: "已确认寄回，等待商家确认收货", data: null });
   } catch {

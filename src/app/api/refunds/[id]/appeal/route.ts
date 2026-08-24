@@ -37,18 +37,21 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     if (refund.userId !== user.id) {
       return NextResponse.json({ code: 1003, message: "无权操作该退款申请", data: null }, { status: 403 });
     }
-    // 状态校验：仅"商家已拒绝"状态可申诉
-    if (refund.status !== "REJECTED") {
-      return NextResponse.json({ code: 2002, message: "当前状态不可申诉", data: null }, { status: 400 });
-    }
-
+    // 事务 + 乐观锁：条件更新，仅"商家已拒绝"状态可申诉
+    let ok = false;
     await prisma.$transaction(async (tx) => {
-      await tx.refund.update({
-        where: { id: refundId },
+      const result = await tx.refund.updateMany({
+        where: { id: refundId, status: "REJECTED" },
         data: { status: "APPEALING", appealReason },
       });
+      if (result.count === 0) return;
+      ok = true;
       await appendRefundEvent(tx, refundId, "APPEALING", "用户提交申诉，等待平台裁决");
     });
+
+    if (!ok) {
+      return NextResponse.json({ code: 2002, message: "当前状态不可申诉", data: null }, { status: 400 });
+    }
 
     return NextResponse.json({ code: 0, message: "申诉已提交，等待平台裁决", data: null });
   } catch {

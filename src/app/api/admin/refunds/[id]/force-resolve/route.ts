@@ -37,25 +37,26 @@ export async function PUT(request: Request, { params }: { params: { id: string }
       return NextResponse.json({ code: 1004, message: "退款申请不存在", data: null }, { status: 404 });
     }
 
-    // 可裁决的状态：待审核（直接介入）或申诉中（申诉裁决）
-    if (refund.status !== "PENDING" && refund.status !== "APPEALING") {
-      return NextResponse.json({ code: 2002, message: "该退款申请已处理，不可重复裁决", data: null }, { status: 400 });
-    }
-
     if (body.action === "APPROVE") {
-      // 裁决通过：退款生效，订单变更为已退款，恢复库存
+      // 事务 + 乐观锁：仅待审核/申诉中的退款可裁决通过
+      let ok = false;
       await prisma.$transaction(async (tx) => {
-        await tx.refund.update({
-          where: { id: refundId },
+        const result = await tx.refund.updateMany({
+          where: { id: refundId, status: { in: ["PENDING", "APPEALING"] } },
           data: { status: "REFUNDED", resolvedAt: new Date() },
         });
+        if (result.count === 0) return;
+        ok = true;
         await appendRefundEvent(tx, refundId, "REFUNDED", `平台裁决通过：${reason}`);
         await tx.order.update({
           where: { id: refund.orderId },
           data: { status: "REFUNDED" },
         });
+        await restoreOrderStock(refund.orderId);
       });
-      await restoreOrderStock(refund.orderId);
+      if (!ok) {
+        return NextResponse.json({ code: 2002, message: "该退款申请已处理，不可重复裁决", data: null }, { status: 400 });
+      }
       return NextResponse.json({ code: 0, message: "已裁决：退款通过，库存已恢复", data: null });
     }
 
@@ -68,17 +69,24 @@ export async function PUT(request: Request, { params }: { params: { id: string }
           ? "PENDING_SHIPMENT"
           : "PENDING_PAYMENT";
 
+    let ok = false;
     await prisma.$transaction(async (tx) => {
-      await tx.refund.update({
-        where: { id: refundId },
+      const result = await tx.refund.updateMany({
+        where: { id: refundId, status: { in: ["PENDING", "APPEALING"] } },
         data: { status: "CLOSED", rejectReason: `管理员裁决驳回：${reason}`, resolvedAt: new Date() },
       });
+      if (result.count === 0) return;
+      ok = true;
       await appendRefundEvent(tx, refundId, "CLOSED", `平台裁决驳回：${reason}`);
       await tx.order.update({
         where: { id: refund.orderId },
         data: { status: revertStatus },
       });
     });
+
+    if (!ok) {
+      return NextResponse.json({ code: 2002, message: "该退款申请已处理，不可重复裁决", data: null }, { status: 400 });
+    }
 
     return NextResponse.json({ code: 0, message: "已裁决：退款驳回，流程已终结", data: null });
   } catch {

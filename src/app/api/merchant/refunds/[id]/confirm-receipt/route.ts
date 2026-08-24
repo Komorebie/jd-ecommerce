@@ -19,7 +19,7 @@ export async function PUT(_request: Request, { params }: { params: { id: string 
     const refundId = Number(params.id);
     const refund = await prisma.refund.findUnique({
       where: { id: refundId },
-      include: { order: true },
+      include: { order: { select: { merchantId: true } } },
     });
 
     if (!refund) {
@@ -29,24 +29,27 @@ export async function PUT(_request: Request, { params }: { params: { id: string 
     if (refund.order.merchantId !== merchant.id) {
       return NextResponse.json({ code: 1003, message: "无权处理该退款申请", data: null }, { status: 403 });
     }
-    // 状态校验：仅"寄回中"的退款可确认收货
-    if (refund.status !== "RETURNING") {
-      return NextResponse.json({ code: 2002, message: "当前状态不可确认收货", data: null }, { status: 400 });
-    }
 
-    // 事务：退款完成 + 订单变更为已退款 + 恢复库存
+    // 事务 + 乐观锁：条件更新，仅"寄回中"的退款可确认收货
+    let ok = false;
     await prisma.$transaction(async (tx) => {
-      await tx.refund.update({
-        where: { id: refundId },
+      const result = await tx.refund.updateMany({
+        where: { id: refundId, status: "RETURNING" },
         data: { status: "REFUNDED", resolvedAt: new Date() },
       });
+      if (result.count === 0) return;
+      ok = true;
       await appendRefundEvent(tx, refundId, "REFUNDED", "商家确认收货，退款完成");
       await tx.order.update({
         where: { id: refund.orderId },
         data: { status: "REFUNDED" },
       });
+      await restoreOrderStock(refund.orderId);
     });
-    await restoreOrderStock(refund.orderId);
+
+    if (!ok) {
+      return NextResponse.json({ code: 2002, message: "当前状态不可确认收货", data: null }, { status: 400 });
+    }
 
     return NextResponse.json({ code: 0, message: "已确认收货，退款完成，库存已恢复", data: null });
   } catch {

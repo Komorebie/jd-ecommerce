@@ -19,7 +19,7 @@ export async function PUT(_request: Request, { params }: { params: { id: string 
     const refundId = Number(params.id);
     const refund = await prisma.refund.findUnique({
       where: { id: refundId },
-      include: { order: true },
+      include: { order: { select: { merchantId: true } } },
     });
 
     if (!refund) {
@@ -29,19 +29,22 @@ export async function PUT(_request: Request, { params }: { params: { id: string 
     if (refund.order.merchantId !== merchant.id) {
       return NextResponse.json({ code: 1003, message: "无权处理该退款申请", data: null }, { status: 403 });
     }
-    // 状态校验：仅待审核的退款可同意
-    if (refund.status !== "PENDING") {
-      return NextResponse.json({ code: 2002, message: "该退款申请已处理，不可重复操作", data: null }, { status: 400 });
-    }
 
-    // 商家同意：退款状态变更为"已同意"，等待用户寄回商品
+    // 事务 + 乐观锁：条件更新，仅待审核的退款可同意，防止重复处理
+    let ok = false;
     await prisma.$transaction(async (tx) => {
-      await tx.refund.update({
-        where: { id: refundId },
+      const result = await tx.refund.updateMany({
+        where: { id: refundId, status: "PENDING" },
         data: { status: "APPROVED", resolvedAt: new Date() },
       });
+      if (result.count === 0) return;
+      ok = true;
       await appendRefundEvent(tx, refundId, "APPROVED", "商家同意退款，等待用户寄回商品（7 天内）");
     });
+
+    if (!ok) {
+      return NextResponse.json({ code: 2002, message: "该退款申请已处理，不可重复操作", data: null }, { status: 400 });
+    }
 
     return NextResponse.json({ code: 0, message: "已同意退款，等待用户寄回商品（7天内）", data: null });
   } catch {

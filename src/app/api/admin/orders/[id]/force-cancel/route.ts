@@ -25,18 +25,16 @@ export async function PUT(_request: Request, { params }: { params: { id: string 
       return NextResponse.json({ code: 1004, message: "订单不存在", data: null }, { status: 404 });
     }
 
-    // 终态订单（已完成/已取消/已退款）不可再强制取消
-    const terminal = ["COMPLETED", "CANCELLED", "REFUNDED"];
-    if (terminal.includes(order.status)) {
-      return NextResponse.json({ code: 2002, message: "订单已处于终态，无法取消", data: null }, { status: 400 });
-    }
-
-    // 事务：取消订单 + 恢复库存 + 关闭该订单所有未完成的退款申请
+    // 事务 + 乐观锁：取消订单 + 恢复库存 + 关闭该订单所有未完成的退款申请
+    let ok = false;
     await prisma.$transaction(async (tx) => {
-      await tx.order.update({
-        where: { id: orderId },
+      // 条件更新：仅非终态订单可强制取消，防止并发覆盖
+      const orderUpdate = await tx.order.updateMany({
+        where: { id: orderId, status: { notIn: ["COMPLETED", "CANCELLED", "REFUNDED"] } },
         data: { status: "CANCELLED", cancelledAt: new Date() },
       });
+      if (orderUpdate.count === 0) return;
+      ok = true;
 
       // 恢复库存（下单时已扣减）
       for (const item of order.items) {
@@ -59,6 +57,10 @@ export async function PUT(_request: Request, { params }: { params: { id: string 
         await appendRefundEvent(tx, rf.id, "CLOSED", "订单被平台强制取消，退款自动关闭");
       }
     });
+
+    if (!ok) {
+      return NextResponse.json({ code: 2002, message: "订单已处于终态，无法取消", data: null }, { status: 400 });
+    }
 
     return NextResponse.json({ code: 0, message: "订单已强制取消，库存已恢复", data: null });
   } catch {

@@ -35,26 +35,29 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     if (refund.order.merchantId !== merchant.id) {
       return NextResponse.json({ code: 1003, message: "无权处理该退款申请", data: null }, { status: 403 });
     }
-    // 状态校验：仅待审核的退款可拒绝
-    if (refund.status !== "PENDING") {
-      return NextResponse.json({ code: 2002, message: "该退款申请已处理，不可重复操作", data: null }, { status: 400 });
-    }
 
     // 计算退款前的订单状态：按订单各时间节点反推
     const revertStatus = computeRevertStatus(refund.order);
 
-    // 事务：拒绝退款 + 记录理由 + 订单恢复原状态
+    // 事务 + 乐观锁：条件更新，仅待审核的退款可拒绝，防止重复处理
+    let ok = false;
     await prisma.$transaction(async (tx) => {
-      await tx.refund.update({
-        where: { id: refundId },
+      const result = await tx.refund.updateMany({
+        where: { id: refundId, status: "PENDING" },
         data: { status: "REJECTED", rejectReason, resolvedAt: new Date() },
       });
+      if (result.count === 0) return;
+      ok = true;
       await appendRefundEvent(tx, refundId, "REJECTED", `商家拒绝退款：${rejectReason}`);
       await tx.order.update({
         where: { id: refund.orderId },
         data: { status: revertStatus },
       });
     });
+
+    if (!ok) {
+      return NextResponse.json({ code: 2002, message: "该退款申请已处理，不可重复操作", data: null }, { status: 400 });
+    }
 
     return NextResponse.json({ code: 0, message: "已拒绝退款，订单已恢复原状态", data: null });
   } catch {

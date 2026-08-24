@@ -57,43 +57,50 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     const { action } = await request.json();
 
     if (action === "pay") {
-      if (order.status !== "PENDING_PAYMENT") {
-        return NextResponse.json({ code: 2002, message: "当前状态不可支付", data: null }, { status: 400 });
-      }
-      await prisma.order.update({
-        where: { id: order.id },
+      // 乐观锁：条件更新，仅待支付可支付
+      const result = await prisma.order.updateMany({
+        where: { id: order.id, status: "PENDING_PAYMENT" },
         data: { status: "PENDING_SHIPMENT", paidAt: new Date() },
       });
+      if (result.count === 0) {
+        return NextResponse.json({ code: 2002, message: "当前状态不可支付", data: null }, { status: 400 });
+      }
       return NextResponse.json({ code: 0, message: "支付成功", data: null });
     }
 
     if (action === "cancel") {
-      if (order.status !== "PENDING_PAYMENT") {
+      // 事务 + 乐观锁：仅待支付可取消，取消时恢复库存
+      let cancelled = false;
+      await prisma.$transaction(async (tx) => {
+        const result = await tx.order.updateMany({
+          where: { id: order.id, status: "PENDING_PAYMENT" },
+          data: { status: "CANCELLED", cancelledAt: new Date() },
+        });
+        if (result.count === 0) return;
+        cancelled = true;
+        for (let i = 0; i < order.items.length; i++) {
+          const item = order.items[i];
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { stock: { increment: item.quantity } },
+          });
+        }
+      });
+      if (!cancelled) {
         return NextResponse.json({ code: 2002, message: "当前订单状态不允许取消", data: null }, { status: 400 });
       }
-      // Restore stock
-      for (let i = 0; i < order.items.length; i++) {
-        const item = order.items[i];
-        await prisma.product.update({
-          where: { id: item.productId },
-          data: { stock: { increment: item.quantity } },
-        });
-      }
-      await prisma.order.update({
-        where: { id: order.id },
-        data: { status: "CANCELLED", cancelledAt: new Date() },
-      });
       return NextResponse.json({ code: 0, message: "订单已取消", data: null });
     }
 
     if (action === "confirm") {
-      if (order.status !== "SHIPPED") {
-        return NextResponse.json({ code: 2002, message: "当前状态不可确认收货", data: null }, { status: 400 });
-      }
-      await prisma.order.update({
-        where: { id: order.id },
+      // 乐观锁：条件更新，仅已发货可确认收货
+      const result = await prisma.order.updateMany({
+        where: { id: order.id, status: "SHIPPED" },
         data: { status: "COMPLETED", completedAt: new Date() },
       });
+      if (result.count === 0) {
+        return NextResponse.json({ code: 2002, message: "当前状态不可确认收货", data: null }, { status: 400 });
+      }
       return NextResponse.json({ code: 0, message: "已确认收货", data: null });
     }
 
