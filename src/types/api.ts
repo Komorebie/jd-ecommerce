@@ -235,6 +235,7 @@ export interface MerchantOrderItem {
   remark: string | null;
   paidAt: string | null;
   shippedAt: string | null;
+  trackingNo: string | null;
   createdAt: string;
   user: { id: number; name: string; email: string } | null;
   address: {

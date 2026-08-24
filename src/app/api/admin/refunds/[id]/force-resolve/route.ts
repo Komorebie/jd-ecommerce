@@ -5,7 +5,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/admin";
-import { restoreOrderStock } from "@/lib/refund";
+import { appendRefundEvent, restoreOrderStock } from "@/lib/refund";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +49,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
           where: { id: refundId },
           data: { status: "REFUNDED", resolvedAt: new Date() },
         });
+        await appendRefundEvent(tx, refundId, "REFUNDED", `平台裁决通过：${reason}`);
         await tx.order.update({
           where: { id: refund.orderId },
           data: { status: "REFUNDED" },
@@ -72,6 +73,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
         where: { id: refundId },
         data: { status: "CLOSED", rejectReason: `管理员裁决驳回：${reason}`, resolvedAt: new Date() },
       });
+      await appendRefundEvent(tx, refundId, "CLOSED", `平台裁决驳回：${reason}`);
       await tx.order.update({
         where: { id: refund.orderId },
         data: { status: revertStatus },

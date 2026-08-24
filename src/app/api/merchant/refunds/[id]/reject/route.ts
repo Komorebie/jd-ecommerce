@@ -3,7 +3,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireMerchant } from "@/lib/merchant";
-import { computeRevertStatus } from "@/lib/refund";
+import { appendRefundEvent, computeRevertStatus } from "@/lib/refund";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +49,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
         where: { id: refundId },
         data: { status: "REJECTED", rejectReason, resolvedAt: new Date() },
       });
+      await appendRefundEvent(tx, refundId, "REJECTED", `商家拒绝退款：${rejectReason}`);
       await tx.order.update({
         where: { id: refund.orderId },
         data: { status: revertStatus },

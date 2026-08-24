@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/admin";
+import { appendRefundEvent } from "@/lib/refund";
 
 export const dynamic = "force-dynamic";
 
@@ -46,10 +47,17 @@ export async function PUT(_request: Request, { params }: { params: { id: string 
       }
 
       // 关闭处理中的退款申请
+      const activeRefunds = await tx.refund.findMany({
+        where: { orderId, status: { in: ["PENDING", "APPROVED"] } },
+        select: { id: true },
+      });
       await tx.refund.updateMany({
         where: { orderId, status: { in: ["PENDING", "APPROVED"] } },
         data: { status: "CLOSED", resolvedAt: new Date(), rejectReason: "订单已被平台强制取消" },
       });
+      for (const rf of activeRefunds) {
+        await appendRefundEvent(tx, rf.id, "CLOSED", "订单被平台强制取消，退款自动关闭");
+      }
     });
 
     return NextResponse.json({ code: 0, message: "订单已强制取消，库存已恢复", data: null });

@@ -20,7 +20,7 @@ export async function GET() {
     }
 
     const orders = await prisma.order.findMany({
-      where: { userId },
+      where: { userId, deletedAt: null },
       include: {
         items: true,
         address: { select: { receiver: true, phone: true, province: true, city: true, district: true, detail: true } },

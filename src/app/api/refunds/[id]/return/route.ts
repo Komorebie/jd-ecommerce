@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { RETURN_DEADLINE_MS, computeRevertStatus } from "@/lib/refund";
+import { RETURN_DEADLINE_MS, appendRefundEvent, computeRevertStatus } from "@/lib/refund";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +46,7 @@ export async function PUT(_request: Request, { params }: { params: { id: string 
           where: { id: refundId },
           data: { status: "CLOSED", rejectReason: "超过 7 天未寄回商品，退款申请已自动关闭" },
         });
+        await appendRefundEvent(tx, refundId, "CLOSED", "超过 7 天未寄回商品，退款自动关闭");
         await tx.order.update({
           where: { id: refund.orderId },
           data: { status: computeRevertStatus(refund.order) },
@@ -54,9 +55,12 @@ export async function PUT(_request: Request, { params }: { params: { id: string 
       return NextResponse.json({ code: 2004, message: "已超过 7 天寄回期限，退款申请已自动关闭", data: null }, { status: 400 });
     }
 
-    await prisma.refund.update({
-      where: { id: refundId },
-      data: { status: "RETURNING" },
+    await prisma.$transaction(async (tx) => {
+      await tx.refund.update({
+        where: { id: refundId },
+        data: { status: "RETURNING" },
+      });
+      await appendRefundEvent(tx, refundId, "RETURNING", "用户已寄回商品，等待商家确认收货");
     });
 
     return NextResponse.json({ code: 0, message: "已确认寄回，等待商家确认收货", data: null });

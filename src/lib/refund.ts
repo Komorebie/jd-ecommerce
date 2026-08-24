@@ -2,7 +2,7 @@
 // 供用户端、商家端、管理端的退款接口复用，保证三端状态机一致
 
 import { prisma } from "@/lib/prisma";
-import type { OrderStatus } from "@prisma/client";
+import type { OrderStatus, Prisma } from "@prisma/client";
 
 /** 用户可在申请后 48 小时内撤销退款申请 */
 export const REFUND_CANCEL_WINDOW_MS = 48 * 60 * 60 * 1000;
@@ -81,6 +81,7 @@ export async function autoCloseExpiredRefunds(): Promise<void> {
           rejectReason: "超过 7 天未寄回商品，退款申请已自动关闭",
         },
       });
+      await appendRefundEvent(tx, refund.id, "CLOSED", "超过 7 天未寄回商品，退款自动关闭");
       if (refund.order.status === "REFUNDING") {
         await tx.order.update({
           where: { id: refund.orderId },
@@ -96,6 +97,30 @@ export async function autoCloseExpiredRefunds(): Promise<void> {
  */
 export function isRefundActive(status: string): boolean {
   return ["PENDING", "APPROVED", "RETURNING", "APPEALING"].includes(status);
+}
+
+export interface RefundTimelineEvent {
+  status: string;
+  note: string;
+  time: string;
+}
+
+/** 追加一条退款流程时间线记录（申请/审核/寄回/退款/申诉等），tx 可传事务客户端 */
+export async function appendRefundEvent(
+  tx: typeof prisma | Prisma.TransactionClient,
+  refundId: number,
+  status: string,
+  note: string,
+) {
+  const refund = await tx.refund.findUnique({ where: { id: refundId }, select: { timeline: true } });
+  const prev: RefundTimelineEvent[] = Array.isArray(refund?.timeline)
+    ? (refund?.timeline as unknown as RefundTimelineEvent[])
+    : [];
+  const event: RefundTimelineEvent = { status, note, time: new Date().toISOString() };
+  await tx.refund.update({
+    where: { id: refundId },
+    data: { timeline: [...prev, event] as unknown as Prisma.InputJsonValue },
+  });
 }
 
 /**
@@ -116,9 +141,12 @@ export async function autoApproveExpiredRefunds(): Promise<number> {
 
   let handled = 0;
   for (const refund of expiredRefunds) {
-    await prisma.refund.update({
-      where: { id: refund.id },
-      data: { status: "APPROVED", resolvedAt: new Date() },
+    await prisma.$transaction(async (tx) => {
+      await tx.refund.update({
+        where: { id: refund.id },
+        data: { status: "APPROVED", resolvedAt: new Date() },
+      });
+      await appendRefundEvent(tx, refund.id, "APPROVED", "商家超过 48 小时未处理，系统自动同意退款");
     });
     handled++;
   }

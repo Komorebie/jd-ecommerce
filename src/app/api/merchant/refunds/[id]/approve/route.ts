@@ -4,6 +4,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireMerchant } from "@/lib/merchant";
+import { appendRefundEvent } from "@/lib/refund";
 
 export const dynamic = "force-dynamic";
 
@@ -34,9 +35,12 @@ export async function PUT(_request: Request, { params }: { params: { id: string 
     }
 
     // 商家同意：退款状态变更为"已同意"，等待用户寄回商品
-    await prisma.refund.update({
-      where: { id: refundId },
-      data: { status: "APPROVED", resolvedAt: new Date() },
+    await prisma.$transaction(async (tx) => {
+      await tx.refund.update({
+        where: { id: refundId },
+        data: { status: "APPROVED", resolvedAt: new Date() },
+      });
+      await appendRefundEvent(tx, refundId, "APPROVED", "商家同意退款，等待用户寄回商品（7 天内）");
     });
 
     return NextResponse.json({ code: 0, message: "已同意退款，等待用户寄回商品（7天内）", data: null });

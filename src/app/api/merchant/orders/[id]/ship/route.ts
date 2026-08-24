@@ -6,7 +6,7 @@ import { requireMerchant } from "@/lib/merchant";
 
 export const dynamic = "force-dynamic";
 
-export async function PUT(_request: Request, { params }: { params: { id: string } }) {
+export async function PUT(request: Request, { params }: { params: { id: string } }) {
   try {
     // 权限校验：仅商家可访问
     const merchant = await requireMerchant();
@@ -29,9 +29,11 @@ export async function PUT(_request: Request, { params }: { params: { id: string 
       return NextResponse.json({ code: 2002, message: "当前订单状态不可发货", data: null }, { status: 400 });
     }
 
+    const { trackingNo } = (await request.json().catch(() => ({}))) as { trackingNo?: string };
+
     await prisma.order.update({
       where: { id: orderId },
-      data: { status: "SHIPPED", shippedAt: new Date() },
+      data: { status: "SHIPPED", shippedAt: new Date(), trackingNo: trackingNo?.trim() || null },
     });
 
     return NextResponse.json({ code: 0, message: "发货成功", data: null });

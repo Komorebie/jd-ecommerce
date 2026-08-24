@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { appendRefundEvent } from "@/lib/refund";
 
 export const dynamic = "force-dynamic";
 
@@ -41,9 +42,12 @@ export async function PUT(request: Request, { params }: { params: { id: string }
       return NextResponse.json({ code: 2002, message: "当前状态不可申诉", data: null }, { status: 400 });
     }
 
-    await prisma.refund.update({
-      where: { id: refundId },
-      data: { status: "APPEALING", appealReason },
+    await prisma.$transaction(async (tx) => {
+      await tx.refund.update({
+        where: { id: refundId },
+        data: { status: "APPEALING", appealReason },
+      });
+      await appendRefundEvent(tx, refundId, "APPEALING", "用户提交申诉，等待平台裁决");
     });
 
     return NextResponse.json({ code: 0, message: "申诉已提交，等待平台裁决", data: null });

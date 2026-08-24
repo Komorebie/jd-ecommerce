@@ -20,7 +20,16 @@ export async function GET(request: Request) {
       orderBy: { createdAt: "desc" },
     });
 
-    return NextResponse.json({ code: 0, message: "success", data: reviews });
+    const data = reviews.map((r) => ({
+      id: r.id,
+      rating: r.rating,
+      content: r.content,
+      merchantReply: r.merchantReply,
+      createdAt: r.createdAt,
+      user: r.user,
+    }));
+
+    return NextResponse.json({ code: 0, message: "success", data });
   } catch {
     return NextResponse.json({ code: 3001, message: "服务器内部错误", data: null }, { status: 500 });
   }

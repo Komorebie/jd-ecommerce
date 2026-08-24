@@ -4,7 +4,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireMerchant } from "@/lib/merchant";
-import { restoreOrderStock } from "@/lib/refund";
+import { appendRefundEvent, restoreOrderStock } from "@/lib/refund";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +40,7 @@ export async function PUT(_request: Request, { params }: { params: { id: string 
         where: { id: refundId },
         data: { status: "REFUNDED", resolvedAt: new Date() },
       });
+      await appendRefundEvent(tx, refundId, "REFUNDED", "商家确认收货，退款完成");
       await tx.order.update({
         where: { id: refund.orderId },
         data: { status: "REFUNDED" },

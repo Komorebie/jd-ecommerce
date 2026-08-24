@@ -19,8 +19,8 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       return NextResponse.json({ code: 1002, message: "请先登录", data: null }, { status: 401 });
     }
 
-    const order = await prisma.order.findUnique({
-      where: { id: Number(params.id) },
+    const order = await prisma.order.findFirst({
+      where: { id: Number(params.id), deletedAt: null },
       include: {
         items: true,
         address: { select: { receiver: true, phone: true, province: true, city: true, district: true, detail: true } },
@@ -98,6 +98,35 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     }
 
     return NextResponse.json({ code: 1001, message: "未知操作", data: null }, { status: 400 });
+  } catch {
+    return NextResponse.json({ code: 3001, message: "服务器内部错误", data: null }, { status: 500 });
+  }
+}
+
+export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
+  try {
+    const userId = await getUserId();
+    if (!userId) {
+      return NextResponse.json({ code: 1002, message: "请先登录", data: null }, { status: 401 });
+    }
+
+    const order = await prisma.order.findFirst({
+      where: { id: Number(params.id), userId, deletedAt: null },
+    });
+    if (!order) {
+      return NextResponse.json({ code: 1004, message: "订单不存在", data: null }, { status: 404 });
+    }
+    // 软删除：仅已取消订单可删除记录
+    if (order.status !== "CANCELLED") {
+      return NextResponse.json({ code: 2002, message: "仅已取消的订单可删除记录", data: null }, { status: 400 });
+    }
+
+    await prisma.order.update({
+      where: { id: order.id },
+      data: { deletedAt: new Date() },
+    });
+
+    return NextResponse.json({ code: 0, message: "订单记录已删除", data: null });
   } catch {
     return NextResponse.json({ code: 3001, message: "服务器内部错误", data: null }, { status: 500 });
   }

@@ -72,6 +72,10 @@ export async function POST(request: Request) {
 
     // PENDING_SHIPMENT: auto refund since not shipped yet
     const refundStatus = order.status === "PENDING_SHIPMENT" ? "APPROVED" : "PENDING";
+    const now = new Date();
+    const initialTimeline = [
+      { status: refundStatus, note: refundStatus === "APPROVED" ? "未发货订单，退款自动通过" : "用户提交退款申请，等待商家审核", time: now.toISOString() },
+    ];
 
     const refund = await prisma.refund.create({
       data: {
@@ -80,6 +84,7 @@ export async function POST(request: Request) {
         reason,
         amount,
         status: refundStatus,
+        timeline: initialTimeline,
       },
     });
 
