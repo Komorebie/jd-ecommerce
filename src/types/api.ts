@@ -201,6 +201,8 @@ export interface AdminRefundItem {
   status: "PENDING" | "APPROVED" | "RETURNING" | "REFUNDED" | "REJECTED" | "APPEALING" | "CLOSED";
   rejectReason: string | null;
   appealReason: string | null;
+  urgedAt: string | null;
+  urgedCount: number;
   appliedAt: string;
   resolvedAt: string | null;
 }

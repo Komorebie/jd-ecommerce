@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Table, Tag, Input, Select, Space, Button, Modal, Typography, message } from "antd";
-import { CheckCircleOutlined, CloseCircleOutlined } from "@ant-design/icons";
+import { CheckCircleOutlined, CloseCircleOutlined, CustomerServiceOutlined, AlertOutlined } from "@ant-design/icons";
 import type { AdminRefundItem } from "@/types/api";
 
 const { Title, Text, Paragraph } = Typography;
@@ -131,6 +131,21 @@ export default function AdminDisputesPage() {
             render: (s: string) => <Tag color={refundStatusMap[s]?.color}>{refundStatusMap[s]?.label ?? s}</Tag>,
           },
           {
+            title: "催办", width: 130,
+            render: (_: unknown, r: AdminRefundItem) =>
+              r.urgedCount > 0 ? (
+                <Space>
+                  <Tag color="volcano" icon={<CustomerServiceOutlined />}>
+                    已催办 ×{r.urgedCount}
+                  </Tag>
+                </Space>
+              ) : r.status === "PENDING" ? (
+                <Text type="secondary" style={{ fontSize: 12 }}>待审核</Text>
+              ) : (
+                <Text type="secondary" style={{ fontSize: 12 }}>—</Text>
+              ),
+          },
+          {
             title: "申请时间", dataIndex: "appliedAt", width: 170,
             render: (v: string) => new Date(v).toLocaleString("zh-CN"),
           },
@@ -142,9 +157,10 @@ export default function AdminDisputesPage() {
                   size="small"
                   type="primary"
                   danger
+                  icon={record.urgedCount > 0 ? <AlertOutlined /> : undefined}
                   onClick={() => { setCurrentRefund(record); setModalOpen(true); }}
                 >
-                  {record.status === "APPEALING" ? "裁决申诉" : "裁决"}
+                  {record.urgedCount > 0 ? "优先裁决" : record.status === "APPEALING" ? "裁决申诉" : "裁决"}
                 </Button>
               ) : (
                 <Text type="secondary">—</Text>
@@ -176,6 +192,18 @@ export default function AdminDisputesPage() {
               <Paragraph>
                 <Text strong>用户申诉理由：</Text>
                 <Text type="danger">{currentRefund.appealReason}</Text>
+              </Paragraph>
+            )}
+            {currentRefund.urgedCount > 0 && (
+              <Paragraph>
+                <Text strong style={{ color: "#fa541c" }}>
+                  <CustomerServiceOutlined /> 用户已催办 {currentRefund.urgedCount} 次
+                </Text>
+                {currentRefund.urgedAt && (
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    （最近 {new Date(currentRefund.urgedAt).toLocaleString("zh-CN")}）
+                  </Text>
+                )}
               </Paragraph>
             )}
             <Paragraph>

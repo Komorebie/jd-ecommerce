@@ -39,6 +39,7 @@ export async function GET(request: Request) {
     };
 
     // 查询总数 + 当前页数据（附订单号和用户信息）
+    // 排序：待处理的优先（催办过的置顶，其次申请时间早的）
     const [total, list] = await Promise.all([
       prisma.refund.count({ where }),
       prisma.refund.findMany({
@@ -47,7 +48,10 @@ export async function GET(request: Request) {
           order: { select: { orderNo: true } },
           user: { select: { name: true, email: true } },
         },
-        orderBy: { id: "desc" },
+        orderBy: [
+          { urgedAt: "desc" },
+          { appliedAt: "asc" },
+        ],
         skip,
         take,
       }),
@@ -65,6 +69,8 @@ export async function GET(request: Request) {
       status: r.status,
       rejectReason: r.rejectReason,
       appealReason: r.appealReason,
+      urgedAt: r.urgedAt,
+      urgedCount: r.urgedCount,
       appliedAt: r.appliedAt,
       resolvedAt: r.resolvedAt,
     }));

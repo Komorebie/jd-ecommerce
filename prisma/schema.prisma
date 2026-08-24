@@ -216,6 +216,8 @@ model Refund {
   status      RefundStatus @default(PENDING)
   rejectReason String?
   appealReason String? // 用户申诉理由
+  urgedAt     DateTime?    // 最近一次催办时间（联系客服催促）
+  urgedCount  Int          @default(0) // 累计催办次数
   timeline    Json         @default("[]") // 退款全流程时间线 [{status,note,time}]
   appliedAt   DateTime     @default(now())
   resolvedAt  DateTime?

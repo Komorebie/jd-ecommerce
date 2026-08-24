@@ -174,6 +174,21 @@ export default function OrderDetailPage() {
     }
   };
 
+  // 联系客服催促（商家迟迟不审核时）
+  const handleUrge = async () => {
+    if (!activeRefund) return;
+    setSubmitting(true);
+    const res = await fetch(`/api/refunds/${activeRefund.id}/urge`, { method: "PUT" });
+    const json = await res.json();
+    setSubmitting(false);
+    if (res.ok) {
+      message.success(json.message);
+      fetchOrder();
+    } else {
+      message.error(json.message);
+    }
+  };
+
   // 订单基础操作（支付/取消/确认收货）
   const handleAction = async (action: string) => {
     if (!order) return;
@@ -316,9 +331,12 @@ export default function OrderDetailPage() {
           )}
 
           <Space>
-            {/* 待审核：48小时内可撤销 */}
+            {/* 待审核：48小时内可撤销 + 可催办 */}
             {activeRefund.status === "PENDING" && (
-              <Button onClick={() => handleRefundAction(activeRefund.id, "cancel")}>撤销退款申请</Button>
+              <>
+                <Button onClick={() => handleRefundAction(activeRefund.id, "cancel")}>撤销退款申请</Button>
+                <Button loading={submitting} onClick={handleUrge}>联系客服催促</Button>
+              </>
             )}
             {/* 商家已同意：寄回商品 */}
             {activeRefund.status === "APPROVED" && (
