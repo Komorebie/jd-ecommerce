@@ -44,7 +44,7 @@ export async function PUT(_request: Request, { params }: { params: { id: string 
         where: { id: refund.orderId },
         data: { status: "REFUNDED" },
       });
-      await restoreOrderStock(refund.orderId);
+      await restoreOrderStock(refund.orderId, tx);
     });
 
     if (!ok) {

@@ -42,12 +42,12 @@ export async function revertOrderStatus(orderId: number) {
 }
 
 /**
- * 恢复订单商品的库存
+ * 恢复订单商品的库存（tx 可传事务客户端，保证与状态更新同事务）
  */
-export async function restoreOrderStock(orderId: number) {
-  const items = await prisma.orderItem.findMany({ where: { orderId } });
+export async function restoreOrderStock(orderId: number, tx: typeof prisma | Prisma.TransactionClient = prisma) {
+  const items = await tx.orderItem.findMany({ where: { orderId } });
   for (const item of items) {
-    await prisma.product.update({
+    await tx.product.update({
       where: { id: item.productId },
       data: { stock: { increment: item.quantity } },
     });

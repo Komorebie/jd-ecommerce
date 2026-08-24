@@ -52,7 +52,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
           where: { id: refund.orderId },
           data: { status: "REFUNDED" },
         });
-        await restoreOrderStock(refund.orderId);
+        await restoreOrderStock(refund.orderId, tx);
       });
       if (!ok) {
         return NextResponse.json({ code: 2002, message: "该退款申请已处理，不可重复裁决", data: null }, { status: 400 });
